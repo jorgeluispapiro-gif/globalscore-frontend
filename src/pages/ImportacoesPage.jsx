@@ -10,6 +10,15 @@ import {
 import { useProjeto } from '../hooks/useProjeto';
 import { api } from '../services/api';
 import { CabecalhoPagina, EstadoVazio, Mensagem } from '../components/ui/Estados';
+import {
+  calcularPesoPlanejado,
+  criarDadosNovoIndicador,
+  montarColunasDoPayload,
+  resumirMetricas,
+  SELECAO_INDICADOR_EXISTENTE,
+  SELECAO_INDICADOR_NOVO,
+  validarIndicadoresMapeados,
+} from '../utils/mapeamentoImportacao';
 
 const configuracaoInicial = {
   linha_inicial: 2,
@@ -63,6 +72,7 @@ export function ImportacoesPage() {
   const [resultado, setResultado] = useState(null);
   const [mensagem, setMensagem] = useState(null);
   const [processando, setProcessando] = useState(false);
+  const [errosMapeamento, setErrosMapeamento] = useState({});
 
   useEffect(() => {
     setArquivo(null);
@@ -70,6 +80,7 @@ export function ImportacoesPage() {
     setValidacao(null);
     setResultado(null);
     setMapeamentos([]);
+    setErrosMapeamento({});
     if (!projetoId) {
       setIndicadores([]);
       return;
@@ -87,14 +98,28 @@ export function ImportacoesPage() {
   }, [lote, configuracao.aba]);
 
   const cabecalhos = preview[0] || [];
+  const resumoMetricas = useMemo(
+    () => resumirMetricas(mapeamentos, indicadores),
+    [mapeamentos, indicadores],
+  );
+  const pesoPlanejado = useMemo(
+    () => calcularPesoPlanejado(indicadores, mapeamentos),
+    [indicadores, mapeamentos],
+  );
 
   function prepararMapeamento(linhas, tipoArquivo, inspecao) {
     const colunas = linhas[0] || [];
-    setMapeamentos(colunas.map((nome, indice) => ({
-      indice_coluna: indice + 1,
-      nome: String(nome || `Coluna ${indice + 1}`),
-      selecao: sugerirPapel(nome),
-    })));
+    setMapeamentos(colunas.map((nome, indice) => {
+      const selecao = sugerirPapel(nome);
+      return {
+        indice_coluna: indice + 1,
+        nome: String(nome || `Coluna ${indice + 1}`),
+        selecao,
+        candidata_metrica: selecao === 'IGNORAR',
+        indicador_existente_id: '',
+        novo_indicador: criarDadosNovoIndicador(nome),
+      };
+    }));
     setConfiguracao((atual) => ({
       ...atual,
       delimitador: tipoArquivo === 'CSV' ? (inspecao.sugestao_delimitador || ';') : atual.delimitador,
@@ -129,19 +154,27 @@ export function ImportacoesPage() {
     setMapeamentos((atuais) => atuais.map((item) => (
       item.indice_coluna === indice ? { ...item, selecao } : item
     )));
+    setErrosMapeamento((atuais) => ({ ...atuais, [indice]: undefined }));
+  }
+
+  function alterarIndicadorExistente(indice, indicadorId) {
+    setMapeamentos((atuais) => atuais.map((item) => (
+      item.indice_coluna === indice ? { ...item, indicador_existente_id: indicadorId } : item
+    )));
+    setErrosMapeamento((atuais) => ({ ...atuais, [indice]: undefined }));
+  }
+
+  function alterarNovoIndicador(indice, campo, valor) {
+    setMapeamentos((atuais) => atuais.map((item) => (
+      item.indice_coluna === indice
+        ? { ...item, novo_indicador: { ...item.novo_indicador, [campo]: valor } }
+        : item
+    )));
+    setErrosMapeamento((atuais) => ({ ...atuais, [indice]: undefined }));
   }
 
   function montarPayload() {
-    const colunas = mapeamentos.map((item) => {
-      if (item.selecao.startsWith('INDICADOR:')) {
-        return {
-          indice_coluna: item.indice_coluna,
-          papel: 'VALOR_INDICADOR',
-          indicador: { acao: 'EXISTENTE', indicador_id: Number(item.selecao.split(':')[1]) },
-        };
-      }
-      return { indice_coluna: item.indice_coluna, papel: item.selecao };
-    });
+    const colunas = montarColunasDoPayload(mapeamentos);
     const leitura = {
       linha_inicial: Number(configuracao.linha_inicial),
       linhas_cabecalho: configuracao.linhas_cabecalho.map(Number),
@@ -159,6 +192,12 @@ export function ImportacoesPage() {
   }
 
   async function validar() {
+    const erros = validarIndicadoresMapeados(mapeamentos);
+    if (Object.keys(erros).length) {
+      setErrosMapeamento(erros);
+      setMensagem({ tipo: 'erro', texto: 'Revise os campos destacados antes de validar.' });
+      return;
+    }
     setProcessando(true);
     setMensagem(null);
     try {
@@ -199,6 +238,7 @@ export function ImportacoesPage() {
     setValidacao(null);
     setResultado(null);
     setMapeamentos([]);
+    setErrosMapeamento({});
     setMensagem(null);
   }
 
@@ -251,9 +291,32 @@ export function ImportacoesPage() {
           <section className="painel">
             <div className="painel__cabecalho painel__cabecalho--simples"><div><span className="sobretitulo">Etapa 2</span><h2>Mapeie as colunas</h2><p>As sugestões são iniciais. Confirme cada papel explicitamente.</p></div></div>
             <div className="mapa-colunas">
-              {mapeamentos.map((item) => <label key={item.indice_coluna}><span>Coluna {item.indice_coluna}</span><strong>{cabecalhos[item.indice_coluna - 1] || item.nome}</strong><select value={item.selecao} onChange={(evento) => alterarMapeamento(item.indice_coluna, evento.target.value)}><option value="IGNORAR">Ignorar coluna</option><option value="CODIGO_ENTIDADE">Código da entidade</option><option value="NOME_ENTIDADE">Nome da entidade</option><option value="PERIODO">Período</option><optgroup label="Associar a indicador existente">{indicadores.map((indicador) => <option key={indicador.id} value={`INDICADOR:${indicador.id}`}>{indicador.nome} ({indicador.unidade_medida})</option>)}</optgroup></select></label>)}
+              {mapeamentos.map((item) => {
+                const nomeColuna = cabecalhos[item.indice_coluna - 1] || item.nome;
+                return <article className="mapa-colunas__item" key={item.indice_coluna}>
+                  <span>Coluna {item.indice_coluna}</span>
+                  <strong>{nomeColuna}</strong>
+                  <label>Função da coluna<select aria-label={`Mapeamento da coluna ${nomeColuna}`} value={item.selecao} onChange={(evento) => alterarMapeamento(item.indice_coluna, evento.target.value)}><option value="IGNORAR">Ignorar coluna</option><option value="CODIGO_ENTIDADE">Código da entidade</option><option value="NOME_ENTIDADE">Nome da entidade</option><option value="PERIODO">Período</option><option value={SELECAO_INDICADOR_EXISTENTE}>Associar a indicador existente</option><option value={SELECAO_INDICADOR_NOVO}>Criar novo indicador</option></select></label>
+                  {item.selecao === SELECAO_INDICADOR_EXISTENTE && <label>Indicador<select aria-label={`Indicador existente da coluna ${nomeColuna}`} value={item.indicador_existente_id} onChange={(evento) => alterarIndicadorExistente(item.indice_coluna, evento.target.value)}><option value="">Selecione</option>{indicadores.map((indicador) => <option key={indicador.id} value={indicador.id}>{indicador.nome} · {indicador.unidade_medida} · {indicador.direcao === 'MAIOR_MELHOR' ? 'Maior é melhor' : 'Menor é melhor'}</option>)}</select></label>}
+                  {item.selecao === SELECAO_INDICADOR_NOVO && <div className="novo-indicador">
+                    <label>Código<input aria-label={`Código do novo indicador da coluna ${nomeColuna}`} value={item.novo_indicador.codigo} onChange={(evento) => alterarNovoIndicador(item.indice_coluna, 'codigo', evento.target.value)} /></label>
+                    <label>Nome<input aria-label={`Nome do novo indicador da coluna ${nomeColuna}`} value={item.novo_indicador.nome} onChange={(evento) => alterarNovoIndicador(item.indice_coluna, 'nome', evento.target.value)} /></label>
+                    <label>Unidade de medida<input aria-label={`Unidade do novo indicador da coluna ${nomeColuna}`} value={item.novo_indicador.unidade_medida} onChange={(evento) => alterarNovoIndicador(item.indice_coluna, 'unidade_medida', evento.target.value)} placeholder="Ex.: unidades, %, minutos" /></label>
+                    <label>Direção<select aria-label={`Direção do novo indicador da coluna ${nomeColuna}`} value={item.novo_indicador.direcao} onChange={(evento) => alterarNovoIndicador(item.indice_coluna, 'direcao', evento.target.value)}><option value="">Selecione</option><option value="MAIOR_MELHOR">Maior é melhor</option><option value="MENOR_MELHOR">Menor é melhor</option></select></label>
+                    <label>Peso percentual<input aria-label={`Peso do novo indicador da coluna ${nomeColuna}`} type="number" min="0" max="100" step="0.01" value={item.novo_indicador.peso_percentual} onChange={(evento) => alterarNovoIndicador(item.indice_coluna, 'peso_percentual', evento.target.value)} /></label>
+                    <label className="check-label"><input type="checkbox" checked={item.novo_indicador.participa_global_score} onChange={(evento) => alterarNovoIndicador(item.indice_coluna, 'participa_global_score', evento.target.checked)} />Participa do Global Score</label>
+                    <label className="check-label"><input type="checkbox" checked={item.novo_indicador.obrigatorio} onChange={(evento) => alterarNovoIndicador(item.indice_coluna, 'obrigatorio', evento.target.checked)} />Indicador obrigatório</label>
+                  </div>}
+                  {errosMapeamento[item.indice_coluna]?.length > 0 && <ul className="erros-mapeamento">{errosMapeamento[item.indice_coluna].map((erro) => <li key={erro}>{erro}</li>)}</ul>}
+                </article>;
+              })}
             </div>
-            <p className="nota-interface">O fluxo visual associa colunas a indicadores já cadastrados. Entidades desconhecidas serão apontadas na validação para decisão consciente.</p>
+            <section className="resumo-metricas" aria-label="Resumo das métricas">
+              <div><span className="sobretitulo">Métricas</span><h3>{resumoMetricas.total} coluna(s) de métricas identificada(s)</h3><p>{resumoMetricas.associados} associada(s) a indicadores existentes · {resumoMetricas.novos} novo(s) indicador(es) · {resumoMetricas.ignorados} ignorada(s)</p></div>
+              <ul>{resumoMetricas.detalhes.map((item) => <li key={`${item.indice_coluna}-${item.coluna}`}><strong>{item.coluna}</strong><span>{item.descricao}</span></li>)}</ul>
+              <div className={`peso-planejado ${Math.abs(pesoPlanejado - 100) < 0.001 ? 'peso-planejado--ok' : 'peso-planejado--alerta'}`}><span>Peso total planejado para o Global Score</span><strong>{pesoPlanejado.toLocaleString('pt-BR')}%</strong>{Math.abs(pesoPlanejado - 100) >= 0.001 && <small>O total está diferente de 100%. Revise os pesos antes de ativar uma Base de Referência.</small>}</div>
+            </section>
+            <p className="nota-interface">As escolhas desta etapa apenas planejam a importação. Novos indicadores serão criados somente após a validação e a confirmação do lote.</p>
             <div className="formulario__acoes"><button className="botao botao--primario" onClick={validar} disabled={processando}>{processando ? 'VALIDANDO…' : 'VALIDAR SEM GRAVAR'}</button></div>
           </section>
         </>
