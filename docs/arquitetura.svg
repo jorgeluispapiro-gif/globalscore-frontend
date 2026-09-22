@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="460" viewBox="0 0 1280 460" role="img" aria-labelledby="titulo descricao">
+  <title id="titulo">Arquitetura do GlobalScore</title>
+  <desc id="descricao">Fluxo entre navegador React, Supabase Auth e API Flask com banco SQLite.</desc>
+  <defs>
+    <linearGradient id="fundo" x1="0" x2="1"><stop stop-color="#06152f"/><stop offset="1" stop-color="#102b55"/></linearGradient>
+    <marker id="seta" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L0 6 L9 3 z" fill="#0ea5e9"/></marker>
+    <filter id="sombra" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-opacity=".12"/></filter>
+  </defs>
+  <rect width="1280" height="460" rx="24" fill="#f3f6f9"/>
+  <rect width="1280" height="88" rx="24" fill="url(#fundo)"/><rect y="64" width="1280" height="24" fill="url(#fundo)"/>
+  <text x="48" y="45" fill="#fff" font-family="Arial, sans-serif" font-weight="700" font-size="26">GLOBALSCORE</text>
+  <text x="48" y="68" fill="#9fc0e5" font-family="Arial, sans-serif" font-size="13" letter-spacing="2">MEASURE · COMPARE · ADVANCE</text>
+  <g filter="url(#sombra)">
+    <rect x="48" y="144" width="292" height="196" rx="16" fill="#fff" stroke="#dce3eb"/>
+    <rect x="494" y="144" width="292" height="196" rx="16" fill="#fff" stroke="#dce3eb"/>
+    <rect x="940" y="144" width="292" height="196" rx="16" fill="#fff" stroke="#dce3eb"/>
+  </g>
+  <circle cx="92" cy="188" r="20" fill="#e9f4ff"/><text x="92" y="194" text-anchor="middle" fill="#0b63ce" font-family="Arial" font-weight="700">1</text>
+  <text x="124" y="183" fill="#06152f" font-family="Arial" font-weight="700" font-size="21">FRONTEND</text><text x="124" y="204" fill="#64748b" font-family="Arial" font-size="13">React + Vite + Recharts</text>
+  <text x="76" y="246" fill="#42516a" font-family="Arial" font-size="14">Interação, navegação, visualização</text><text x="76" y="271" fill="#42516a" font-family="Arial" font-size="14">e storytelling dos resultados.</text>
+  <rect x="76" y="298" width="166" height="24" rx="12" fill="#eef6ff"/><text x="159" y="315" text-anchor="middle" fill="#0751ad" font-family="Arial" font-size="11">Bearer access_token</text>
+  <circle cx="538" cy="188" r="20" fill="#e9f9f0"/><text x="538" y="194" text-anchor="middle" fill="#08713d" font-family="Arial" font-weight="700">2</text>
+  <text x="570" y="183" fill="#06152f" font-family="Arial" font-weight="700" font-size="21">API EXTERNA</text><text x="570" y="204" fill="#64748b" font-family="Arial" font-size="13">Supabase Auth</text>
+  <text x="522" y="246" fill="#42516a" font-family="Arial" font-size="14">Login por e-mail e senha, sessão</text><text x="522" y="271" fill="#42516a" font-family="Arial" font-size="14">persistida e emissão de token.</text>
+  <rect x="522" y="298" width="173" height="24" rx="12" fill="#e9f9f0"/><text x="608" y="315" text-anchor="middle" fill="#08713d" font-family="Arial" font-size="11">serviço público externo</text>
+  <circle cx="984" cy="188" r="20" fill="#e8f5f7"/><text x="984" y="194" text-anchor="middle" fill="#007d75" font-family="Arial" font-weight="700">3</text>
+  <text x="1016" y="183" fill="#06152f" font-family="Arial" font-weight="700" font-size="21">BACKEND</text><text x="1016" y="204" fill="#64748b" font-family="Arial" font-size="13">Flask RESTX + SQLite</text>
+  <text x="968" y="246" fill="#42516a" font-family="Arial" font-size="14">Regras, percentis, pesos, score,</text><text x="968" y="271" fill="#42516a" font-family="Arial" font-size="14">validação e persistência.</text>
+  <rect x="968" y="298" width="183" height="24" rx="12" fill="#e8f5f7"/><text x="1059" y="315" text-anchor="middle" fill="#007d75" font-family="Arial" font-size="11">fonte do resultado calculado</text>
+  <line x1="350" y1="216" x2="478" y2="216" stroke="#0ea5e9" stroke-width="3" marker-end="url(#seta)"/><text x="414" y="202" text-anchor="middle" fill="#64748b" font-family="Arial" font-size="12">login</text>
+  <line x1="786" y1="216" x2="924" y2="216" stroke="#0ea5e9" stroke-width="3" marker-end="url(#seta)"/><text x="855" y="202" text-anchor="middle" fill="#64748b" font-family="Arial" font-size="12">validação</text>
+  <path d="M940 300 C820 400 450 400 340 300" fill="none" stroke="#0b63ce" stroke-width="3" marker-end="url(#seta)"/>
+  <text x="640" y="394" text-anchor="middle" fill="#42516a" font-family="Arial" font-size="13">JSON com dados persistidos e resultados calculados</text>
+  <text x="640" y="432" text-anchor="middle" fill="#64748b" font-family="Arial" font-size="12">Três componentes independentes · comunicação HTTP · responsabilidades separadas</text>
+</svg>
