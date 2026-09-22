@@ -19,6 +19,7 @@ import {
   SELECAO_INDICADOR_NOVO,
   validarIndicadoresMapeados,
 } from '../utils/mapeamentoImportacao';
+import { agruparEntidadesDesconhecidas, aplicarCriacaoEmLote, montarDecisoesEntidades } from '../utils/entidadesImportacao';
 
 const configuracaoInicial = {
   linha_inicial: 2,
@@ -66,6 +67,10 @@ export function ImportacoesPage() {
   const [arquivo, setArquivo] = useState(null);
   const [lote, setLote] = useState(null);
   const [indicadores, setIndicadores] = useState([]);
+  const [entidades, setEntidades] = useState([]);
+  const [grupos, setGrupos] = useState([]);
+  const [decisoesEntidades, setDecisoesEntidades] = useState({});
+  const [grupoLote, setGrupoLote] = useState('');
   const [configuracao, setConfiguracao] = useState(configuracaoInicial);
   const [mapeamentos, setMapeamentos] = useState([]);
   const [validacao, setValidacao] = useState(null);
@@ -81,12 +86,24 @@ export function ImportacoesPage() {
     setResultado(null);
     setMapeamentos([]);
     setErrosMapeamento({});
+    setDecisoesEntidades({});
+    setGrupoLote('');
     if (!projetoId) {
       setIndicadores([]);
+      setEntidades([]);
+      setGrupos([]);
       return;
     }
-    api.get(`/indicadores?projeto_id=${projetoId}`)
-      .then((dados) => setIndicadores(dados.filter((item) => item.ativo === true)))
+    Promise.all([
+      api.get(`/indicadores?projeto_id=${projetoId}`),
+      api.get(`/entidades?projeto_id=${projetoId}`),
+      api.get(`/grupos?projeto_id=${projetoId}`),
+    ])
+      .then(([dadosIndicadores, dadosEntidades, dadosGrupos]) => {
+        setIndicadores(dadosIndicadores.filter((item) => item.ativo === true));
+        setEntidades(dadosEntidades.filter((item) => item.ativa === true));
+        setGrupos(dadosGrupos.filter((item) => item.ativo === true));
+      })
       .catch((erro) => setMensagem({ tipo: 'erro', texto: erro.message }));
   }, [projetoId]);
 
@@ -105,6 +122,10 @@ export function ImportacoesPage() {
   const pesoPlanejado = useMemo(
     () => calcularPesoPlanejado(indicadores, mapeamentos),
     [indicadores, mapeamentos],
+  );
+  const entidadesDesconhecidas = useMemo(
+    () => agruparEntidadesDesconhecidas(validacao?.erros || validacao?.problemas || []),
+    [validacao],
   );
 
   function prepararMapeamento(linhas, tipoArquivo, inspecao) {
@@ -188,7 +209,7 @@ export function ImportacoesPage() {
     };
     if (lote.tipo_arquivo === 'CSV') leitura.delimitador = configuracao.delimitador;
     else leitura.aba = configuracao.aba;
-    return { configuracao_leitura: leitura, mapeamento: { formato: 'LARGO', colunas } };
+    return { configuracao_leitura: leitura, mapeamento: { formato: 'LARGO', colunas, decisoes_entidades: montarDecisoesEntidades(decisoesEntidades) } };
   }
 
   async function validar() {
@@ -239,6 +260,8 @@ export function ImportacoesPage() {
     setResultado(null);
     setMapeamentos([]);
     setErrosMapeamento({});
+    setDecisoesEntidades({});
+    setGrupoLote('');
     setMensagem(null);
   }
 
@@ -326,8 +349,23 @@ export function ImportacoesPage() {
         <section className="painel painel-validacao">
           <div className="painel__cabecalho painel__cabecalho--simples"><div><span className="sobretitulo">Etapa 3 · Validação prévia</span><h2>Resultado da validação</h2><p>Erros bloqueiam a confirmação. Alertas e valores atípicos exigem revisão.</p></div><span className={`status status--${validacao.quantidade_erros ? 'erro' : validacao.quantidade_alertas ? 'alerta' : 'ativo'}`}>{validacao.status}</span></div>
           <div className="resumo-validacao"><div><span>Linhas lidas</span><strong>{validacao.linhas_lidas}</strong></div><div><span>Observações previstas</span><strong>{validacao.observacoes_a_criar}</strong></div><div><span>Erros</span><strong>{validacao.quantidade_erros}</strong></div><div><span>Alertas</span><strong>{validacao.quantidade_alertas}</strong></div></div>
-          <ListaOcorrencias titulo="Erros bloqueantes" itens={validacao.erros} tipo="erro" />
-          <ListaOcorrencias titulo="Alertas de qualidade e valores atípicos" itens={validacao.alertas} tipo="alerta" />
+          {entidadesDesconhecidas.length > 0 && <section className="entidades-resolver">
+            <div className="entidades-resolver__cabecalho"><div><span className="sobretitulo">Decisão por código</span><h3>Entidades a resolver</h3><p>{entidadesDesconhecidas.length} entidade(s) desconhecida(s) · {entidadesDesconhecidas.reduce((total, item) => total + item.quantidade_linhas, 0)} linha(s) afetada(s)</p></div></div>
+            {grupos.length === 0
+              ? <Mensagem tipo="alerta">Não há grupos ativos neste projeto. Para criar entidades, cadastre ou ative um grupo antes de revalidar.</Mensagem>
+              : <div className="acao-lote"><label>Grupo para criação em lote<select aria-label="Grupo para criar todas as entidades" value={grupoLote} onChange={(evento) => setGrupoLote(evento.target.value)}><option value="">Selecione</option>{grupos.map((grupo) => <option key={grupo.id} value={grupo.id}>{grupo.nome}</option>)}</select></label><button className="botao botao--secundario" disabled={!grupoLote} onClick={() => setDecisoesEntidades((atuais) => aplicarCriacaoEmLote(entidadesDesconhecidas, atuais, grupoLote))}>CRIAR TODAS AS ENTIDADES DESCONHECIDAS</button></div>}
+            <div className="entidades-resolver__lista">{entidadesDesconhecidas.map((item) => {
+              const decisao = decisoesEntidades[item.codigo] || {};
+              return <article key={item.codigo} className="entidade-decisao"><div><strong>{item.codigo}</strong><span>{item.quantidade_linhas} linha(s) afetada(s)</span></div><label>Decisão<select aria-label={`Decisão para a entidade ${item.codigo}`} value={decisao.acao || ''} onChange={(evento) => setDecisoesEntidades((atuais) => ({ ...atuais, [item.codigo]: { acao: evento.target.value } }))}><option value="">Selecione</option><option value="CRIAR">Criar nova entidade</option><option value="ASSOCIAR">Associar a entidade existente</option><option value="IGNORAR">Ignorar esta entidade</option></select></label>
+                {decisao.acao === 'CRIAR' && <div className="entidade-decisao__campos"><label>Código<input value={item.codigo} disabled /></label><label>Nome (opcional)<input aria-label={`Nome da nova entidade ${item.codigo}`} value={decisao.nome || ''} onChange={(evento) => setDecisoesEntidades((atuais) => ({ ...atuais, [item.codigo]: { ...atuais[item.codigo], nome: evento.target.value } }))} /></label><label>Grupo<select aria-label={`Grupo da nova entidade ${item.codigo}`} value={decisao.grupo_id || ''} onChange={(evento) => setDecisoesEntidades((atuais) => ({ ...atuais, [item.codigo]: { ...atuais[item.codigo], grupo_id: evento.target.value } }))}><option value="">Selecione</option>{grupos.map((grupo) => <option key={grupo.id} value={grupo.id}>{grupo.nome}</option>)}</select></label></div>}
+                {decisao.acao === 'ASSOCIAR' && <label>Entidade existente<select aria-label={`Entidade existente para ${item.codigo}`} value={decisao.entidade_id || ''} onChange={(evento) => setDecisoesEntidades((atuais) => ({ ...atuais, [item.codigo]: { ...atuais[item.codigo], entidade_id: evento.target.value } }))}><option value="">Selecione</option>{entidades.map((entidade) => { const grupo = grupos.find((itemGrupo) => itemGrupo.id === entidade.grupo_id); return <option key={entidade.id} value={entidade.id}>{entidade.codigo} · {entidade.nome} · {grupo?.nome || 'Grupo não informado'}</option>; })}</select></label>}
+                {decisao.acao === 'IGNORAR' && <p>As {item.quantidade_linhas} linha(s) desta entidade não serão importadas.</p>}
+              </article>;
+            })}</div>
+            <div className="formulario__acoes"><button className="botao botao--primario" onClick={validar} disabled={processando}>{processando ? 'REVALIDANDO…' : 'REVALIDAR DADOS'}</button></div>
+          </section>}
+          {(validacao.erros?.length > 0 || validacao.alertas?.length > 0) && <details className="detalhes-validacao"><summary>Detalhes da validação</summary><ListaOcorrencias titulo="Erros bloqueantes" itens={validacao.erros} tipo="erro" /><ListaOcorrencias titulo="Alertas de qualidade e valores atípicos" itens={validacao.alertas} tipo="alerta" /></details>}
+          {!validacao.quantidade_erros && <section className="resumo-entidades"><h3>Resumo das entidades</h3><p>Reconhecidas: <strong>{validacao.entidades_reconhecidas ?? 0}</strong> · Novas: <strong>{validacao.novas_entidades?.length ?? 0}</strong> · Associadas manualmente: <strong>{Object.values(decisoesEntidades).filter((item) => item.acao === 'ASSOCIAR').length}</strong> · Ignoradas: <strong>{Object.values(decisoesEntidades).filter((item) => item.acao === 'IGNORAR').length}</strong></p></section>}
           {!validacao.quantidade_erros && <div className="confirmacao-alertas"><CheckCircle2 aria-hidden="true" /><div><strong>{validacao.quantidade_alertas ? 'Existem alertas. Deseja confirmar mesmo assim?' : 'O lote está pronto para confirmação.'}</strong><p>A confirmação registra todas as observações do lote.</p></div><button className="botao botao--primario" onClick={confirmar} disabled={processando}>{processando ? 'CONFIRMANDO…' : validacao.quantidade_alertas ? 'ACEITAR ALERTAS E CONFIRMAR' : 'CONFIRMAR IMPORTAÇÃO'}</button></div>}
         </section>
       )}

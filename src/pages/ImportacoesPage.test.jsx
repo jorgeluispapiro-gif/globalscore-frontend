@@ -47,6 +47,55 @@ describe('indicadores dentro da importação', () => {
     });
   });
 
+  it('agrupa entidades desconhecidas, filtra opções ativas e revalida com as decisões', async () => {
+    obter.mockImplementation((caminho) => {
+      if (caminho.startsWith('/indicadores')) return Promise.resolve([]);
+      if (caminho.startsWith('/entidades')) return Promise.resolve([
+        { id: 11, codigo: 'E01', nome: 'Existente', grupo_id: 21, ativa: true },
+        { id: 12, codigo: 'E02', nome: 'Inativa', grupo_id: 21, ativa: false },
+      ]);
+      return Promise.resolve([
+        { id: 21, nome: 'Grupo ativo', ativo: true },
+        { id: 22, nome: 'Grupo inativo', ativo: false },
+      ]);
+    });
+    let validacoes = 0;
+    enviar.mockImplementation((caminho) => {
+      if (caminho === '/importacoes') return Promise.resolve({ id: 9, tipo_arquivo: 'CSV', nome_arquivo_original: 'dados.csv', inspecao: { sugestao_delimitador: ';', preview: [['codigo', 'periodo', 'produtividade'], ['U01', '01/2026', '98']] } });
+      validacoes += 1;
+      if (validacoes === 1) return Promise.resolve({ quantidade_erros: 6, quantidade_alertas: 0, linhas_lidas: 6, observacoes_a_criar: 0, status: 'COM_ERROS', erros: Array.from({ length: 6 }, (_, indice) => ({ tipo: 'ENTIDADE_DESCONHECIDA', valor_original: 'U01', linha: indice + 2, mensagem: 'Entidade desconhecida' })), alertas: [] });
+      return Promise.resolve({ quantidade_erros: 0, quantidade_alertas: 0, linhas_lidas: 6, observacoes_a_criar: 6, entidades_reconhecidas: 1, novas_entidades: [], status: 'VALIDADA', erros: [], alertas: [] });
+    });
+    render(<ImportacoesPage />);
+    const arquivo = new File(['codigo;periodo;produtividade'], 'dados.csv', { type: 'text/csv' });
+    const campoArquivo = screen.getByLabelText('Arquivo de dados');
+    fireEvent.change(campoArquivo, { target: { files: [arquivo] } });
+    fireEvent.submit(campoArquivo.closest('form'));
+    await screen.findByText('Mapeie as colunas');
+    fireEvent.change(screen.getByLabelText('Mapeamento da coluna produtividade'), { target: { value: 'CRIAR_INDICADOR' } });
+    fireEvent.change(screen.getByLabelText('Código do novo indicador da coluna produtividade'), { target: { value: 'PROD' } });
+    fireEvent.change(screen.getByLabelText('Unidade do novo indicador da coluna produtividade'), { target: { value: 'unidades' } });
+    fireEvent.change(screen.getByLabelText('Direção do novo indicador da coluna produtividade'), { target: { value: 'MAIOR_MELHOR' } });
+    fireEvent.change(screen.getByLabelText('Peso do novo indicador da coluna produtividade'), { target: { value: '100' } });
+    fireEvent.click(screen.getByRole('button', { name: 'VALIDAR SEM GRAVAR' }));
+
+    expect(await screen.findByText('Entidades a resolver')).toBeInTheDocument();
+    expect(screen.getByText('1 entidade(s) desconhecida(s) · 6 linha(s) afetada(s)')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Decisão para a entidade U01'), { target: { value: 'ASSOCIAR' } });
+    const seletor = screen.getByLabelText('Entidade existente para U01');
+    expect(within(seletor).getByRole('option', { name: 'E01 · Existente · Grupo ativo' })).toBeInTheDocument();
+    expect(within(seletor).queryByText(/Inativa/)).not.toBeInTheDocument();
+    fireEvent.change(seletor, { target: { value: '11' } });
+    fireEvent.click(screen.getByRole('button', { name: 'REVALIDAR DADOS' }));
+
+    await waitFor(() => expect(enviar).toHaveBeenCalledTimes(3));
+    const payload = enviar.mock.calls.at(-1)[1];
+    expect(payload.mapeamento.decisoes_entidades).toEqual({ U01: { acao: 'ASSOCIAR', entidade_id: 11 } });
+    expect(payload.mapeamento.colunas[2].indicador).toMatchObject({ acao: 'CRIAR', dados: { codigo: 'PROD' } });
+    expect(enviar.mock.calls.some(([caminho]) => caminho === '/entidades')).toBe(false);
+    expect(await screen.findByText(/Reconhecidas:/)).toBeInTheDocument();
+  });
+
   it('planeja um novo indicador sem persistir antes da confirmação', async () => {
     render(<ImportacoesPage />);
     await waitFor(() => expect(obter).toHaveBeenCalledWith('/indicadores?projeto_id=1'));
