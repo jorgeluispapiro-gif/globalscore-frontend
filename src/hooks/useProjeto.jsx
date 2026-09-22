@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from '../services/api';
 
 const ContextoProjeto = createContext(null);
@@ -8,31 +8,36 @@ export function ProvedorProjeto({ children }) {
   const [projetoId, setProjetoId] = useState(() => localStorage.getItem('globalscore:projeto-id') || '');
   const [carregandoProjetos, setCarregando] = useState(true);
 
-  function selecionarProjeto(id) {
+  const selecionarProjeto = useCallback((id) => {
     const valor = id ? String(id) : '';
     setProjetoId(valor);
     if (valor) localStorage.setItem('globalscore:projeto-id', valor);
     else localStorage.removeItem('globalscore:projeto-id');
-  }
+  }, []);
 
-  async function recarregarProjetos() {
+  const recarregarProjetos = useCallback(async () => {
     setCarregando(true);
     try {
       const dados = await api.get('/projetos');
       setProjetos(dados);
-      const existe = dados.some((item) => String(item.id) === String(projetoId));
-      if (!existe && dados[0]) selecionarProjeto(dados[0].id);
+      setProjetoId((atual) => {
+        const existe = dados.some((item) => String(item.id) === String(atual));
+        if (existe || !dados[0]) return atual;
+        const primeiroId = String(dados[0].id);
+        localStorage.setItem('globalscore:projeto-id', primeiroId);
+        return primeiroId;
+      });
     } finally {
       setCarregando(false);
     }
-  }
+  }, []);
 
-  useEffect(() => { recarregarProjetos().catch(() => setCarregando(false)); }, []);
+  useEffect(() => { recarregarProjetos().catch(() => setCarregando(false)); }, [recarregarProjetos]);
 
   const projeto = projetos.find((item) => String(item.id) === String(projetoId)) || null;
   const valor = useMemo(
     () => ({ projetos, projeto, projetoId, selecionarProjeto, recarregarProjetos, carregandoProjetos }),
-    [projetos, projeto, projetoId, carregandoProjetos],
+    [projetos, projeto, projetoId, selecionarProjeto, recarregarProjetos, carregandoProjetos],
   );
   return <ContextoProjeto.Provider value={valor}>{children}</ContextoProjeto.Provider>;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pencil, Plus } from 'lucide-react';
 import { api } from '../services/api';
 import { useProjeto } from '../hooks/useProjeto';
@@ -13,12 +13,12 @@ export function EntidadesPage() {
   const [aberto, setAberto] = useState(false);
   const [mensagem, setMensagem] = useState(null);
 
-  async function carregar() {
+  const carregar = useCallback(async () => {
     if (!projetoId) { setEntidades([]); setGrupos([]); return; }
     const [lista, listaGrupos] = await Promise.all([api.get(`/entidades?projeto_id=${projetoId}`), api.get(`/grupos?projeto_id=${projetoId}`)]);
     setEntidades(lista); setGrupos(listaGrupos);
-  }
-  useEffect(() => { carregar().catch((e) => setMensagem({ tipo: 'erro', texto: e.message })); }, [projetoId]);
+  }, [projetoId]);
+  useEffect(() => { carregar().catch((e) => setMensagem({ tipo: 'erro', texto: e.message })); }, [carregar]);
   function nova() { setFormulario({ codigo: '', nome: '', descricao: '', grupo_id: grupos[0]?.id || '', ativa: true }); setEditando(null); setAberto(true); }
   function editar(item) { setFormulario({ codigo: item.codigo, nome: item.nome, descricao: item.descricao || '', grupo_id: item.grupo_id, ativa: item.ativa }); setEditando(item.id); setAberto(true); }
   async function salvar(evento) {

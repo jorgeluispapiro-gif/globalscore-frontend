@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Power } from 'lucide-react';
 import { api } from '../services/api';
 import { useProjeto } from '../hooks/useProjeto';
@@ -13,8 +13,8 @@ export function IndicadoresPage() {
   const [editando, setEditando] = useState(null);
   const [aberto, setAberto] = useState(false);
   const [mensagem, setMensagem] = useState(null);
-  async function carregar() { setIndicadores(projetoId ? await api.get(`/indicadores?projeto_id=${projetoId}`) : []); }
-  useEffect(() => { carregar().catch((e) => setMensagem({ tipo: 'erro', texto: e.message })); }, [projetoId]);
+  const carregar = useCallback(async () => { setIndicadores(projetoId ? await api.get(`/indicadores?projeto_id=${projetoId}`) : []); }, [projetoId]);
+  useEffect(() => { carregar().catch((e) => setMensagem({ tipo: 'erro', texto: e.message })); }, [carregar]);
   const pesoTotal = useMemo(() => indicadores.filter((i) => i.ativo && i.participa_global_score).reduce((soma, item) => soma + item.peso_percentual, 0), [indicadores]);
   function novo() { setFormulario(inicial); setEditando(null); setAberto(true); }
   function editar(item) { setFormulario({ codigo: item.codigo, nome: item.nome, descricao: item.descricao || '', unidade_medida: item.unidade_medida, direcao: item.direcao, peso_percentual: item.peso_percentual, obrigatorio: item.obrigatorio, participa_global_score: item.participa_global_score }); setEditando(item.id); setAberto(true); }
