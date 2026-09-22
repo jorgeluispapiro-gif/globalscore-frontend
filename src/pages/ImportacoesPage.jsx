@@ -86,7 +86,7 @@ export function ImportacoesPage() {
       return;
     }
     api.get(`/indicadores?projeto_id=${projetoId}`)
-      .then((dados) => setIndicadores(dados.filter((item) => item.ativo)))
+      .then((dados) => setIndicadores(dados.filter((item) => item.ativo === true)))
       .catch((erro) => setMensagem({ tipo: 'erro', texto: erro.message }));
   }, [projetoId]);
 

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ImportacoesPage } from './ImportacoesPage';
 
@@ -102,5 +102,32 @@ describe('indicadores dentro da importação', () => {
     expect(screen.getByText('Selecione a direção.')).toBeInTheDocument();
     expect(screen.getByText('Informe um peso entre 0 e 100.')).toBeInTheDocument();
     expect(enviar.mock.calls.some(([caminho]) => caminho === '/importacoes/9/validar')).toBe(false);
+  });
+
+  it('oferece somente indicadores ativos para uma nova associação', async () => {
+    obter.mockResolvedValueOnce([
+      {
+        id: 1, nome: 'Qualidade ativa', codigo: 'QUAL', unidade_medida: '%',
+        direcao: 'MAIOR_MELHOR', peso_percentual: 60, participa_global_score: true, ativo: true,
+      },
+      {
+        id: 2, nome: 'Indicador inativo', codigo: 'INATIVO', unidade_medida: 'unidades',
+        direcao: 'MENOR_MELHOR', peso_percentual: 40, participa_global_score: true, ativo: false,
+      },
+    ]);
+    render(<ImportacoesPage />);
+
+    const arquivo = new File(['codigo;periodo;produtividade'], 'dados.csv', { type: 'text/csv' });
+    const campoArquivo = screen.getByLabelText('Arquivo de dados');
+    fireEvent.change(campoArquivo, { target: { files: [arquivo] } });
+    fireEvent.submit(campoArquivo.closest('form'));
+
+    await screen.findByText('Mapeie as colunas');
+    fireEvent.change(screen.getByLabelText('Mapeamento da coluna produtividade'), { target: { value: 'ASSOCIAR_INDICADOR' } });
+
+    const seletor = screen.getByLabelText('Indicador existente da coluna produtividade');
+    expect(within(seletor).getByRole('option', { name: 'Qualidade ativa · % · Maior é melhor' })).toBeInTheDocument();
+    expect(within(seletor).queryByRole('option', { name: /Indicador inativo/ })).not.toBeInTheDocument();
+    expect(screen.getByText('60%')).toBeInTheDocument();
   });
 });

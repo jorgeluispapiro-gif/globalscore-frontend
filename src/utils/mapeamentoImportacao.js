@@ -116,7 +116,7 @@ export function resumirMetricas(mapeamentos, indicadores) {
 
 export function calcularPesoPlanejado(indicadores, mapeamentos) {
   const pesoExistente = indicadores
-    .filter((item) => item.ativo && item.participa_global_score)
+    .filter((item) => item.ativo === true && item.participa_global_score)
     .reduce((total, item) => total + Number(item.peso_percentual || 0), 0);
   const pesoNovo = mapeamentos
     .filter((item) => item.selecao === SELECAO_INDICADOR_NOVO && item.novo_indicador?.participa_global_score)
