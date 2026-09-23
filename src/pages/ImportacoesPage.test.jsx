@@ -68,7 +68,7 @@ describe('indicadores dentro da importação', () => {
     });
     render(<ImportacoesPage />);
     const arquivo = new File(['codigo;periodo;produtividade'], 'dados.csv', { type: 'text/csv' });
-    const campoArquivo = screen.getByLabelText('Arquivo de dados');
+    const campoArquivo = await screen.findByLabelText('Arquivo de dados');
     fireEvent.change(campoArquivo, { target: { files: [arquivo] } });
     fireEvent.submit(campoArquivo.closest('form'));
     await screen.findByText('Mapeie as colunas');
@@ -110,7 +110,7 @@ describe('indicadores dentro da importação', () => {
     await waitFor(() => expect(obter).toHaveBeenCalledWith('/indicadores?projeto_id=1'));
 
     const arquivo = new File(['codigo;periodo;produtividade'], 'dados.csv', { type: 'text/csv' });
-    const campoArquivo = screen.getByLabelText('Arquivo de dados');
+    const campoArquivo = await screen.findByLabelText('Arquivo de dados');
     fireEvent.change(campoArquivo, { target: { files: [arquivo] } });
     fireEvent.submit(campoArquivo.closest('form'));
 
@@ -147,7 +147,7 @@ describe('indicadores dentro da importação', () => {
   it('impede a validação enquanto faltam decisões obrigatórias', async () => {
     render(<ImportacoesPage />);
     const arquivo = new File(['codigo;periodo;produtividade'], 'dados.csv', { type: 'text/csv' });
-    const campoArquivo = screen.getByLabelText('Arquivo de dados');
+    const campoArquivo = await screen.findByLabelText('Arquivo de dados');
     fireEvent.change(campoArquivo, { target: { files: [arquivo] } });
     fireEvent.submit(campoArquivo.closest('form'));
 
@@ -176,7 +176,7 @@ describe('indicadores dentro da importação', () => {
     render(<ImportacoesPage />);
 
     const arquivo = new File(['codigo;periodo;produtividade'], 'dados.csv', { type: 'text/csv' });
-    const campoArquivo = screen.getByLabelText('Arquivo de dados');
+    const campoArquivo = await screen.findByLabelText('Arquivo de dados');
     fireEvent.change(campoArquivo, { target: { files: [arquivo] } });
     fireEvent.submit(campoArquivo.closest('form'));
 
@@ -205,7 +205,7 @@ describe('indicadores dentro da importação', () => {
     });
     render(<ImportacoesPage />);
     const arquivo = new File(['codigo;periodo;produtividade'], 'dados.csv', { type: 'text/csv' });
-    const campoArquivo = screen.getByLabelText('Arquivo de dados');
+    const campoArquivo = await screen.findByLabelText('Arquivo de dados');
     fireEvent.change(campoArquivo, { target: { files: [arquivo] } });
     fireEvent.submit(campoArquivo.closest('form'));
     await screen.findByText('Mapeie as colunas');
@@ -252,7 +252,7 @@ describe('indicadores dentro da importação', () => {
       return Promise.reject(new Error('Falha amigável ao criar grupo.'));
     });
     render(<ImportacoesPage />);
-    const campoArquivo = screen.getByLabelText('Arquivo de dados');
+    const campoArquivo = await screen.findByLabelText('Arquivo de dados');
     fireEvent.change(campoArquivo, { target: { files: [new File(['codigo;periodo'], 'dados.csv')] } });
     fireEvent.submit(campoArquivo.closest('form'));
     await screen.findByText('Mapeie as colunas');

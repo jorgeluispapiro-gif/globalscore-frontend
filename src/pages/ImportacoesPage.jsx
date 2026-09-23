@@ -20,17 +20,9 @@ import {
   validarIndicadoresMapeados,
 } from '../utils/mapeamentoImportacao';
 import { agruparEntidadesDesconhecidas, aplicarCriacaoEmLote, localizarGrupoComMesmoNome, montarDecisoesEntidades, validarDecisoesEntidades } from '../utils/entidadesImportacao';
+import { CONFIGURACAO_INICIAL_IMPORTACAO, restaurarConfiguracaoImportacao, restaurarDecisoesEntidades, restaurarMapeamentosImportacao } from '../utils/retomadaImportacao';
 
-const configuracaoInicial = {
-  linha_inicial: 2,
-  linhas_cabecalho: [1],
-  delimitador: ';',
-  aba: '',
-  formato_periodo: 'MM/AAAA',
-  separador_decimal: ',',
-  separador_milhar: '.',
-  percentual_como: 'FRACAO',
-};
+const configuracaoInicial = CONFIGURACAO_INICIAL_IMPORTACAO;
 
 function sugerirPapel(cabecalho) {
   const nome = String(cabecalho || '').toLocaleLowerCase('pt-BR');
@@ -77,6 +69,10 @@ export function ImportacoesPage() {
   const [novoGrupo, setNovoGrupo] = useState({ nome: '', descricao: '' });
   const [erroGrupo, setErroGrupo] = useState('');
   const [grupoDuplicado, setGrupoDuplicado] = useState(null);
+  const [importacoesPendentes, setImportacoesPendentes] = useState([]);
+  const [carregandoAuxiliares, setCarregandoAuxiliares] = useState(false);
+  const [descarteAlvo, setDescarteAlvo] = useState(null);
+  const [erroRetomadaId, setErroRetomadaId] = useState(null);
   const [configuracao, setConfiguracao] = useState(configuracaoInicial);
   const [mapeamentos, setMapeamentos] = useState([]);
   const [validacao, setValidacao] = useState(null);
@@ -99,25 +95,33 @@ export function ImportacoesPage() {
     setNovoGrupo({ nome: '', descricao: '' });
     setErroGrupo('');
     setGrupoDuplicado(null);
+    setImportacoesPendentes([]);
+    setDescarteAlvo(null);
+    setErroRetomadaId(null);
     if (!projetoId) {
       setIndicadores([]);
       setEntidades([]);
       setGrupos([]);
       setTodosGrupos([]);
+      setCarregandoAuxiliares(false);
       return;
     }
+    setCarregandoAuxiliares(true);
     Promise.all([
       api.get(`/indicadores?projeto_id=${projetoId}`),
       api.get(`/entidades?projeto_id=${projetoId}`),
       api.get(`/grupos?projeto_id=${projetoId}`),
+      api.get(`/importacoes?projeto_id=${projetoId}&pendentes=true`),
     ])
-      .then(([dadosIndicadores, dadosEntidades, dadosGrupos]) => {
+      .then(([dadosIndicadores, dadosEntidades, dadosGrupos, dadosImportacoes]) => {
         setIndicadores(dadosIndicadores.filter((item) => item.ativo === true));
         setEntidades(dadosEntidades.filter((item) => item.ativa === true));
         setTodosGrupos(dadosGrupos);
         setGrupos(dadosGrupos.filter((item) => item.ativo === true));
+        setImportacoesPendentes(dadosImportacoes);
       })
-      .catch((erro) => setMensagem({ tipo: 'erro', texto: erro.message }));
+      .catch((erro) => setMensagem({ tipo: 'erro', texto: erro.message }))
+      .finally(() => setCarregandoAuxiliares(false));
   }, [projetoId]);
 
   const preview = useMemo(() => {
@@ -172,6 +176,7 @@ export function ImportacoesPage() {
       dados.append('arquivo', arquivo);
       const resposta = await api.post('/importacoes', dados);
       setLote(resposta);
+      setImportacoesPendentes((atuais) => [resposta, ...atuais.filter((item) => item.id !== resposta.id)]);
       const linhas = resposta.tipo_arquivo === 'CSV'
         ? resposta.inspecao.preview
         : resposta.inspecao.abas?.[0]?.preview || [];
@@ -207,22 +212,94 @@ export function ImportacoesPage() {
     setErrosMapeamento((atuais) => ({ ...atuais, [indice]: undefined }));
   }
 
-  function montarPayload() {
-    const colunas = montarColunasDoPayload(mapeamentos);
+  function montarPayload(loteAtual = lote, configuracaoAtual = configuracao, mapeamentosAtuais = mapeamentos, decisoesAtuais = decisoesEntidades) {
+    const colunas = montarColunasDoPayload(mapeamentosAtuais);
     const leitura = {
-      linha_inicial: Number(configuracao.linha_inicial),
-      linhas_cabecalho: configuracao.linhas_cabecalho.map(Number),
-      colunas_utilizadas: mapeamentos.map((item) => item.indice_coluna),
-      formato_periodo: configuracao.formato_periodo,
+      linha_inicial: Number(configuracaoAtual.linha_inicial),
+      linhas_cabecalho: configuracaoAtual.linhas_cabecalho.map(Number),
+      colunas_utilizadas: mapeamentosAtuais.map((item) => item.indice_coluna),
+      formato_periodo: configuracaoAtual.formato_periodo,
       formato_numerico: {
-        separador_decimal: configuracao.separador_decimal,
-        separador_milhar: configuracao.separador_milhar,
-        percentual_como: configuracao.percentual_como,
+        separador_decimal: configuracaoAtual.separador_decimal,
+        separador_milhar: configuracaoAtual.separador_milhar,
+        percentual_como: configuracaoAtual.percentual_como,
       },
     };
-    if (lote.tipo_arquivo === 'CSV') leitura.delimitador = configuracao.delimitador;
-    else leitura.aba = configuracao.aba;
-    return { configuracao_leitura: leitura, mapeamento: { formato: 'LARGO', colunas, decisoes_entidades: montarDecisoesEntidades(decisoesEntidades) } };
+    if (loteAtual.tipo_arquivo === 'CSV') leitura.delimitador = configuracaoAtual.delimitador;
+    else leitura.aba = configuracaoAtual.aba;
+    return { configuracao_leitura: leitura, mapeamento: { formato: 'LARGO', colunas, decisoes_entidades: montarDecisoesEntidades(decisoesAtuais) } };
+  }
+
+  async function continuarImportacao(importacao) {
+    setProcessando(true);
+    setMensagem(null);
+    setErroRetomadaId(null);
+    try {
+      const inspecao = await api.get(`/importacoes/${importacao.id}/inspecao`);
+      const loteRestaurado = { ...importacao, inspecao };
+      const configuracaoRestaurada = restaurarConfiguracaoImportacao(importacao.configuracao_leitura, inspecao, importacao.tipo_arquivo);
+      const previewRestaurado = importacao.tipo_arquivo === 'CSV'
+        ? inspecao.preview || []
+        : inspecao.abas?.find((item) => item.nome === configuracaoRestaurada.aba)?.preview || inspecao.abas?.[0]?.preview || [];
+      setLote(loteRestaurado);
+      setConfiguracao(configuracaoRestaurada);
+      setResultado(null);
+      if (importacao.mapeamento?.colunas?.length) {
+        const mapeamentosRestaurados = restaurarMapeamentosImportacao(importacao.mapeamento, previewRestaurado[0] || []);
+        const decisoesRestauradas = restaurarDecisoesEntidades(importacao.mapeamento.decisoes_entidades);
+        setMapeamentos(mapeamentosRestaurados);
+        setDecisoesEntidades(decisoesRestauradas);
+        try {
+          const resposta = await api.post(
+            `/importacoes/${importacao.id}/validar`,
+            montarPayload(loteRestaurado, configuracaoRestaurada, mapeamentosRestaurados, decisoesRestauradas),
+          );
+          setValidacao(resposta);
+          setMensagem({ tipo: resposta.quantidade_erros ? 'erro' : 'sucesso', texto: resposta.quantidade_erros ? 'A importação foi retomada. Revise as pendências encontradas.' : 'Importação retomada e revalidada.' });
+        } catch (erro) {
+          setValidacao(null);
+          setMensagem({ tipo: 'erro', texto: erro.message });
+        }
+      } else {
+        setValidacao(null);
+        prepararMapeamento(previewRestaurado, importacao.tipo_arquivo, inspecao);
+        setConfiguracao(configuracaoRestaurada);
+        setMensagem({ tipo: 'sucesso', texto: 'Importação retomada. Confirme o mapeamento das colunas.' });
+      }
+    } catch (erro) {
+      setErroRetomadaId(importacao.id);
+      setMensagem({ tipo: 'erro', texto: erro.status === 409 ? 'Este arquivo não está mais disponível para continuar a importação.' : erro.message });
+    } finally {
+      setProcessando(false);
+    }
+  }
+
+  function limparLoteAtivo() {
+    setArquivo(null);
+    setLote(null);
+    setValidacao(null);
+    setResultado(null);
+    setMapeamentos([]);
+    setDecisoesEntidades({});
+    setErrosMapeamento({});
+    setErrosEntidades({});
+  }
+
+  async function confirmarDescarte() {
+    if (!descarteAlvo) return;
+    setProcessando(true);
+    try {
+      await api.post(`/importacoes/${descarteAlvo.id}/anular`);
+      setImportacoesPendentes((atuais) => atuais.filter((item) => item.id !== descarteAlvo.id));
+      if (lote?.id === descarteAlvo.id) limparLoteAtivo();
+      setDescarteAlvo(null);
+      setErroRetomadaId(null);
+      setMensagem({ tipo: 'sucesso', texto: 'Importação descartada.' });
+    } catch (erro) {
+      setMensagem({ tipo: 'erro', texto: erro.message });
+    } finally {
+      setProcessando(false);
+    }
   }
 
   async function validar() {
@@ -327,6 +404,7 @@ export function ImportacoesPage() {
         confirmar_alertas: validacao?.quantidade_alertas > 0,
       });
       setResultado(resposta);
+      setImportacoesPendentes((atuais) => atuais.filter((item) => item.id !== lote.id));
       setMensagem({ tipo: 'sucesso', texto: 'Importação concluída. As observações foram registradas com rastreabilidade.' });
     } catch (erro) {
       setMensagem({ tipo: 'erro', texto: erro.message });
@@ -368,7 +446,12 @@ export function ImportacoesPage() {
       {mensagem && <Mensagem tipo={mensagem.tipo}>{mensagem.texto}</Mensagem>}
       {!projetoId && <EstadoVazio titulo="Nenhum projeto selecionado" descricao="Selecione o projeto que receberá as observações importadas." />}
 
-      {projetoId && !lote && (
+      {projetoId && !lote && carregandoAuxiliares && <section className="painel"><p>Carregando importações em andamento…</p></section>}
+      {projetoId && !lote && !carregandoAuxiliares && importacoesPendentes.length > 0 && <section className="painel importacoes-pendentes"><div className="painel__cabecalho painel__cabecalho--simples"><div><span className="sobretitulo">Retomar trabalho</span><h2>Importações em andamento</h2><p>Escolha conscientemente qual lote deseja continuar ou descartar.</p></div></div><div className="importacoes-pendentes__lista">{importacoesPendentes.map((item) => <article key={item.id}><div><strong>{item.nome_arquivo_original}</strong><span>{item.tipo_arquivo} · {item.status}</span><small>{item.criado_em ? new Date(item.criado_em).toLocaleString('pt-BR') : 'Data não informada'} · {item.quantidade_linhas_lidas ?? 0} linha(s) · {item.quantidade_erros ?? 0} erro(s) · {item.quantidade_alertas ?? 0} alerta(s)</small>{erroRetomadaId === item.id && <em>O arquivo deste lote precisa ser descartado para sair da lista.</em>}</div><div className="formulario__acoes"><button className="botao botao--primario" disabled={processando || carregandoAuxiliares || erroRetomadaId === item.id} onClick={() => continuarImportacao(item)}>CONTINUAR</button><button className="botao botao--texto" onClick={() => setDescarteAlvo(item)}>DESCARTAR</button></div></article>)}</div></section>}
+
+      {descarteAlvo && <section className="painel confirmacao-descarte" role="dialog" aria-label="Descartar importação"><h2>Descartar esta importação?</h2><p>Os dados ainda não confirmados e o arquivo temporário serão removidos.</p><div className="formulario__acoes"><button className="botao botao--texto" onClick={() => setDescarteAlvo(null)}>CANCELAR</button><button className="botao botao--primario" disabled={processando} onClick={confirmarDescarte}>DESCARTAR IMPORTAÇÃO</button></div></section>}
+
+      {projetoId && !lote && !carregandoAuxiliares && (
         <section className="painel painel-upload">
           <div className="painel-upload__icone"><Upload aria-hidden="true" /></div>
           <div><span className="sobretitulo">Etapa 1</span><h2>Selecione a planilha</h2><p>Projeto de destino: <strong>{projeto?.nome}</strong>. Formatos aceitos: CSV ou XLSX, até 10 MB.</p></div>
@@ -384,7 +467,7 @@ export function ImportacoesPage() {
           <section className="painel arquivo-resumo">
             <FileSpreadsheet aria-hidden="true" />
             <div><span className="sobretitulo">Arquivo analisado</span><h2>{lote.nome_arquivo_original}</h2><p>{lote.tipo_arquivo} · Lote #{lote.id} · nenhuma observação gravada nesta etapa</p></div>
-            <button className="botao botao--texto" onClick={reiniciar}>Trocar arquivo</button>
+            <button className="botao botao--texto" onClick={() => setDescarteAlvo(lote)}>DESCARTAR E TROCAR ARQUIVO</button>
           </section>
           <section className="painel">
             <div className="painel__cabecalho painel__cabecalho--simples"><div><span className="sobretitulo">Preview</span><h2>Confira a região de dados</h2><p>As dez primeiras linhas são exibidas somente para orientar o mapeamento.</p></div></div>
