@@ -45,3 +45,13 @@ export function validarDecisoesEntidades(entidades = [], decisoes = {}) {
   });
   return erros;
 }
+
+export function normalizarNomeGrupo(nome) {
+  return String(nome || '').trim().toLocaleLowerCase('pt-BR');
+}
+
+export function localizarGrupoComMesmoNome(grupos, nome) {
+  const nomeNormalizado = normalizarNomeGrupo(nome);
+  if (!nomeNormalizado) return null;
+  return grupos.find((grupo) => normalizarNomeGrupo(grupo.nome) === nomeNormalizado) || null;
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agruparEntidadesDesconhecidas, aplicarCriacaoEmLote, montarDecisoesEntidades, validarDecisoesEntidades } from './entidadesImportacao';
+import { agruparEntidadesDesconhecidas, aplicarCriacaoEmLote, localizarGrupoComMesmoNome, montarDecisoesEntidades, validarDecisoesEntidades } from './entidadesImportacao';
 
 describe('resolução de entidades na importação', () => {
   it('agrupa erros repetidos por código e conta as linhas afetadas', () => {
@@ -48,5 +48,11 @@ describe('resolução de entidades na importação', () => {
       [{ codigo: 'U01' }, { codigo: 'U02' }, { codigo: 'U03' }],
       { U01: { acao: 'CRIAR', grupo_id: '1' }, U02: { acao: 'ASSOCIAR', entidade_id: '2' }, U03: { acao: 'IGNORAR' } },
     )).toEqual({});
+  });
+
+  it('localiza nome de grupo ignorando caixa e espaços externos', () => {
+    const grupos = [{ id: 1, nome: 'Unidades Operacionais', ativo: true }];
+    expect(localizarGrupoComMesmoNome(grupos, ' unidades operacionais ')).toEqual(grupos[0]);
+    expect(localizarGrupoComMesmoNome(grupos, 'Outro grupo')).toBeNull();
   });
 });

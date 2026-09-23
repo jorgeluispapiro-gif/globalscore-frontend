@@ -188,4 +188,88 @@ describe('indicadores dentro da importação', () => {
     expect(within(seletor).queryByRole('option', { name: /Indicador inativo/ })).not.toBeInTheDocument();
     expect(screen.getByText('60%')).toBeInTheDocument();
   });
+
+  it('cria grupo no contexto, seleciona-o e preserva o estado da importação', async () => {
+    obter.mockImplementation((caminho) => {
+      if (caminho.startsWith('/grupos')) return Promise.resolve([
+        { id: 21, nome: 'Grupo existente', ativo: true },
+        { id: 22, nome: 'Grupo inativo', ativo: false },
+      ]);
+      return Promise.resolve([]);
+    });
+    enviar.mockImplementation((caminho, payload) => {
+      if (caminho === '/importacoes') return Promise.resolve({ id: 9, tipo_arquivo: 'CSV', nome_arquivo_original: 'dados.csv', inspecao: { sugestao_delimitador: ';', preview: [['codigo', 'periodo', 'produtividade'], ['U01', '01/2026', '98']] } });
+      if (caminho === '/importacoes/9/validar') return Promise.resolve({ quantidade_erros: 1, quantidade_alertas: 0, linhas_lidas: 1, observacoes_a_criar: 0, status: 'COM_ERROS', erros: [{ tipo: 'ENTIDADE_DESCONHECIDA', valor_original: 'U01', linha: 2 }], alertas: [] });
+      if (caminho === '/grupos') return Promise.resolve({ id: 23, ...payload });
+      return Promise.resolve({});
+    });
+    render(<ImportacoesPage />);
+    const arquivo = new File(['codigo;periodo;produtividade'], 'dados.csv', { type: 'text/csv' });
+    const campoArquivo = screen.getByLabelText('Arquivo de dados');
+    fireEvent.change(campoArquivo, { target: { files: [arquivo] } });
+    fireEvent.submit(campoArquivo.closest('form'));
+    await screen.findByText('Mapeie as colunas');
+    fireEvent.change(screen.getByLabelText('Mapeamento da coluna produtividade'), { target: { value: 'CRIAR_INDICADOR' } });
+    fireEvent.change(screen.getByLabelText('Código do novo indicador da coluna produtividade'), { target: { value: 'PROD' } });
+    fireEvent.change(screen.getByLabelText('Unidade do novo indicador da coluna produtividade'), { target: { value: 'unidades' } });
+    fireEvent.change(screen.getByLabelText('Direção do novo indicador da coluna produtividade'), { target: { value: 'MAIOR_MELHOR' } });
+    fireEvent.change(screen.getByLabelText('Peso do novo indicador da coluna produtividade'), { target: { value: '100' } });
+    fireEvent.click(screen.getByRole('button', { name: 'VALIDAR SEM GRAVAR' }));
+    await screen.findByText('Entidades a resolver');
+
+    fireEvent.click(screen.getByRole('button', { name: '+ CRIAR NOVO GRUPO' }));
+    expect(screen.getByText('Novo grupo comparável')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'CRIAR GRUPO' }));
+    expect(await screen.findByText('Informe o nome do grupo.')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Nome do novo grupo'), { target: { value: ' grupo existente ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'CRIAR GRUPO' }));
+    expect(await screen.findByText('Já existe um grupo com esse nome neste projeto.')).toBeInTheDocument();
+    expect(enviar.mock.calls.filter(([caminho]) => caminho === '/grupos')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'USAR GRUPO EXISTENTE' }));
+    expect(screen.getByLabelText('Grupo para criar todas as entidades')).toHaveValue('21');
+
+    fireEvent.click(screen.getByRole('button', { name: '+ CRIAR NOVO GRUPO' }));
+    fireEvent.change(screen.getByLabelText('Nome do novo grupo'), { target: { value: 'Novo grupo' } });
+    fireEvent.change(screen.getByLabelText('Descrição do novo grupo'), { target: { value: 'Descrição' } });
+    fireEvent.click(screen.getByRole('button', { name: 'CRIAR GRUPO' }));
+    await waitFor(() => expect(enviar).toHaveBeenCalledWith('/grupos', { projeto_id: 1, nome: 'Novo grupo', descricao: 'Descrição', ativo: true }));
+    expect(await screen.findByText('Grupo criado e selecionado.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Grupo para criar todas as entidades')).toHaveValue('23');
+    expect(within(screen.getByLabelText('Grupo para criar todas as entidades')).getByRole('option', { name: 'Novo grupo' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Código do novo indicador da coluna produtividade')).toHaveValue('PROD');
+    expect(within(screen.getByLabelText('Grupo para criar todas as entidades')).queryByRole('option', { name: 'Grupo inativo' })).not.toBeInTheDocument();
+  });
+
+  it('impede duplicata de grupo inativo e preserva o formulário', async () => {
+    obter.mockImplementation((caminho) => caminho.startsWith('/grupos')
+      ? Promise.resolve([{ id: 22, nome: 'Grupo arquivado', ativo: false }])
+      : Promise.resolve([]));
+    let validacoes = 0;
+    enviar.mockImplementation((caminho) => {
+      if (caminho === '/importacoes') return Promise.resolve({ id: 9, tipo_arquivo: 'CSV', nome_arquivo_original: 'dados.csv', inspecao: { sugestao_delimitador: ';', preview: [['codigo', 'periodo'], ['U01', '01/2026']] } });
+      if (caminho.includes('/validar')) { validacoes += 1; return Promise.resolve({ quantidade_erros: 1, quantidade_alertas: 0, linhas_lidas: 1, observacoes_a_criar: 0, status: 'COM_ERROS', erros: [{ tipo: 'ENTIDADE_DESCONHECIDA', valor_original: 'U01', linha: 2 }], alertas: [] }); }
+      return Promise.reject(new Error('Falha amigável ao criar grupo.'));
+    });
+    render(<ImportacoesPage />);
+    const campoArquivo = screen.getByLabelText('Arquivo de dados');
+    fireEvent.change(campoArquivo, { target: { files: [new File(['codigo;periodo'], 'dados.csv')] } });
+    fireEvent.submit(campoArquivo.closest('form'));
+    await screen.findByText('Mapeie as colunas');
+    fireEvent.click(screen.getByRole('button', { name: 'VALIDAR SEM GRAVAR' }));
+    await screen.findByText('Nenhum grupo disponível para estas entidades.');
+    fireEvent.click(screen.getByRole('button', { name: 'CRIAR PRIMEIRO GRUPO' }));
+    fireEvent.change(screen.getByLabelText('Nome do novo grupo'), { target: { value: ' grupo arquivado ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'CRIAR GRUPO' }));
+    expect(await screen.findByText('Já existe um grupo inativo com esse nome.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'USAR GRUPO EXISTENTE' })).not.toBeInTheDocument();
+    expect(enviar.mock.calls.filter(([caminho]) => caminho === '/grupos')).toHaveLength(0);
+
+    fireEvent.change(screen.getByLabelText('Nome do novo grupo'), { target: { value: 'Grupo com falha' } });
+    fireEvent.click(screen.getByRole('button', { name: 'CRIAR GRUPO' }));
+    expect(await screen.findByText('Falha amigável ao criar grupo.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Nome do novo grupo')).toHaveValue('Grupo com falha');
+    expect(screen.getByText('Entidades a resolver')).toBeInTheDocument();
+    expect(validacoes).toBe(1);
+  });
 });
