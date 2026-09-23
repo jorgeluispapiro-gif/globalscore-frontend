@@ -81,10 +81,19 @@ describe('indicadores dentro da importação', () => {
 
     expect(await screen.findByText('Entidades a resolver')).toBeInTheDocument();
     expect(screen.getByText('1 entidade(s) desconhecida(s) · 6 linha(s) afetada(s)')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'REVALIDAR DADOS' }));
+    expect(await screen.findByText('Defina como esta entidade deve ser tratada.')).toBeInTheDocument();
+    expect(screen.getByText('Revise as entidades pendentes antes de revalidar.')).toBeInTheDocument();
+    expect(enviar).toHaveBeenCalledTimes(2);
+
     fireEvent.change(screen.getByLabelText('Decisão para a entidade U01'), { target: { value: 'ASSOCIAR' } });
     const seletor = screen.getByLabelText('Entidade existente para U01');
     expect(within(seletor).getByRole('option', { name: 'E01 · Existente · Grupo ativo' })).toBeInTheDocument();
     expect(within(seletor).queryByText(/Inativa/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'REVALIDAR DADOS' }));
+    expect(await screen.findByText('Selecione a entidade existente.')).toBeInTheDocument();
+    expect(enviar).toHaveBeenCalledTimes(2);
+
     fireEvent.change(seletor, { target: { value: '11' } });
     fireEvent.click(screen.getByRole('button', { name: 'REVALIDAR DADOS' }));
 

@@ -34,3 +34,14 @@ export function aplicarCriacaoEmLote(entidades, decisoes, grupoId) {
   });
   return resultado;
 }
+
+export function validarDecisoesEntidades(entidades = [], decisoes = {}) {
+  const erros = {};
+  entidades.forEach(({ codigo }) => {
+    const decisao = decisoes[codigo] || {};
+    if (!decisao.acao) erros[codigo] = 'Defina como esta entidade deve ser tratada.';
+    else if (decisao.acao === 'CRIAR' && !decisao.grupo_id) erros[codigo] = 'Selecione o grupo da nova entidade.';
+    else if (decisao.acao === 'ASSOCIAR' && !decisao.entidade_id) erros[codigo] = 'Selecione a entidade existente.';
+  });
+  return erros;
+}

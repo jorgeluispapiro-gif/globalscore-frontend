@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agruparEntidadesDesconhecidas, aplicarCriacaoEmLote, montarDecisoesEntidades } from './entidadesImportacao';
+import { agruparEntidadesDesconhecidas, aplicarCriacaoEmLote, montarDecisoesEntidades, validarDecisoesEntidades } from './entidadesImportacao';
 
 describe('resolução de entidades na importação', () => {
   it('agrupa erros repetidos por código e conta as linhas afetadas', () => {
@@ -30,5 +30,23 @@ describe('resolução de entidades na importação', () => {
       '4',
     );
     expect(resultado).toEqual({ U01: { acao: 'IGNORAR' }, U02: { acao: 'CRIAR', grupo_id: '4', nome: '' } });
+  });
+
+  it('identifica decisão vazia, criação sem grupo e associação sem entidade', () => {
+    expect(validarDecisoesEntidades(
+      [{ codigo: 'U01' }, { codigo: 'U02' }, { codigo: 'U03' }, { codigo: 'U04' }],
+      { U02: { acao: 'CRIAR' }, U03: { acao: 'ASSOCIAR' }, U04: { acao: 'IGNORAR' } },
+    )).toEqual({
+      U01: 'Defina como esta entidade deve ser tratada.',
+      U02: 'Selecione o grupo da nova entidade.',
+      U03: 'Selecione a entidade existente.',
+    });
+  });
+
+  it('aceita ignorar e decisões de criação ou associação completas', () => {
+    expect(validarDecisoesEntidades(
+      [{ codigo: 'U01' }, { codigo: 'U02' }, { codigo: 'U03' }],
+      { U01: { acao: 'CRIAR', grupo_id: '1' }, U02: { acao: 'ASSOCIAR', entidade_id: '2' }, U03: { acao: 'IGNORAR' } },
+    )).toEqual({});
   });
 });
