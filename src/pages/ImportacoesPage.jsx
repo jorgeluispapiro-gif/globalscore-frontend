@@ -80,6 +80,13 @@ export function ImportacoesPage() {
   const [mensagem, setMensagem] = useState(null);
   const [processando, setProcessando] = useState(false);
   const [errosMapeamento, setErrosMapeamento] = useState({});
+  const [modoConfiguracao, setModoConfiguracao] = useState('MANUAL');
+  const [reconhecimentoPerfil, setReconhecimentoPerfil] = useState(null);
+  const [perfilSelecionadoId, setPerfilSelecionadoId] = useState('');
+  const [formularioPerfilAberto, setFormularioPerfilAberto] = useState(false);
+  const [nomePerfil, setNomePerfil] = useState('');
+  const [erroNomePerfil, setErroNomePerfil] = useState('');
+  const [perfilSalvo, setPerfilSalvo] = useState(null);
 
   useEffect(() => {
     setArquivo(null);
@@ -98,6 +105,13 @@ export function ImportacoesPage() {
     setImportacoesPendentes([]);
     setDescarteAlvo(null);
     setErroRetomadaId(null);
+    setModoConfiguracao('MANUAL');
+    setReconhecimentoPerfil(null);
+    setPerfilSelecionadoId('');
+    setFormularioPerfilAberto(false);
+    setNomePerfil('');
+    setErroNomePerfil('');
+    setPerfilSalvo(null);
     if (!projetoId) {
       setIndicadores([]);
       setEntidades([]);
@@ -170,6 +184,9 @@ export function ImportacoesPage() {
     if (!arquivo || !projetoId) return;
     setProcessando(true);
     setMensagem(null);
+    setModoConfiguracao('RECONHECENDO');
+    setReconhecimentoPerfil(null);
+    setPerfilSelecionadoId('');
     try {
       const dados = new FormData();
       dados.append('projeto_id', projetoId);
@@ -181,8 +198,29 @@ export function ImportacoesPage() {
         ? resposta.inspecao.preview
         : resposta.inspecao.abas?.[0]?.preview || [];
       prepararMapeamento(linhas, resposta.tipo_arquivo, resposta.inspecao);
-      setMensagem({ tipo: 'sucesso', texto: 'Arquivo recebido. Confirme como cada coluna deve ser interpretada.' });
+      try {
+        const reconhecimento = await api.post(`/importacoes/${resposta.id}/reconhecer-perfil`);
+        setReconhecimentoPerfil(reconhecimento);
+        if (reconhecimento.resultado === 'COMPATIVEL') {
+          setPerfilSelecionadoId(String(reconhecimento.perfil_sugerido.id));
+          setModoConfiguracao('PERFIL');
+          setMensagem(null);
+        } else if (reconhecimento.resultado === 'AMBIGUO') {
+          setModoConfiguracao('PERFIL');
+          setMensagem({ tipo: 'alerta', texto: 'Mais de uma configuração corresponde a este arquivo.' });
+        } else {
+          setModoConfiguracao('MANUAL');
+          setMensagem({ tipo: 'sucesso', texto: 'Arquivo recebido. Confirme como cada coluna deve ser interpretada.' });
+        }
+      } catch (erroReconhecimento) {
+        setModoConfiguracao('MANUAL');
+        setMensagem({
+          tipo: 'erro',
+          texto: `${erroReconhecimento.message} Você ainda pode mapear o arquivo manualmente.`,
+        });
+      }
     } catch (erro) {
+      setModoConfiguracao('MANUAL');
       setMensagem({ tipo: 'erro', texto: erro.message });
     } finally {
       setProcessando(false);
@@ -212,6 +250,31 @@ export function ImportacoesPage() {
     setErrosMapeamento((atuais) => ({ ...atuais, [indice]: undefined }));
   }
 
+  function reconstruirEstadoPersistido(importacao, inspecao) {
+    const configuracaoRestaurada = restaurarConfiguracaoImportacao(
+      importacao.configuracao_leitura,
+      inspecao,
+      importacao.tipo_arquivo,
+    );
+    const previewRestaurado = importacao.tipo_arquivo === 'CSV'
+      ? inspecao.preview || []
+      : inspecao.abas?.find((item) => item.nome === configuracaoRestaurada.aba)?.preview
+        || inspecao.abas?.[0]?.preview || [];
+    const mapeamentosRestaurados = restaurarMapeamentosImportacao(
+      importacao.mapeamento,
+      previewRestaurado[0] || [],
+    );
+    const decisoesRestauradas = restaurarDecisoesEntidades(
+      importacao.mapeamento?.decisoes_entidades,
+    );
+    return {
+      configuracaoRestaurada,
+      previewRestaurado,
+      mapeamentosRestaurados,
+      decisoesRestauradas,
+    };
+  }
+
   function montarPayload(loteAtual = lote, configuracaoAtual = configuracao, mapeamentosAtuais = mapeamentos, decisoesAtuais = decisoesEntidades) {
     const colunas = montarColunasDoPayload(mapeamentosAtuais);
     const leitura = {
@@ -230,6 +293,64 @@ export function ImportacoesPage() {
     return { configuracao_leitura: leitura, mapeamento: { formato: 'LARGO', colunas, decisoes_entidades: montarDecisoesEntidades(decisoesAtuais) } };
   }
 
+  function mapearManualmente() {
+    setModoConfiguracao('MANUAL');
+    setMensagem({ tipo: 'sucesso', texto: 'Mapeamento manual disponível para este lote.' });
+  }
+
+  async function usarConfiguracaoConhecida() {
+    if (!perfilSelecionadoId) return;
+    setProcessando(true);
+    setMensagem(null);
+    try {
+      const respostaAplicacao = await api.post(`/importacoes/${lote.id}/aplicar-perfil`, {
+        perfil_id: Number(perfilSelecionadoId),
+      });
+      const importacaoAplicada = respostaAplicacao.importacao;
+      const loteAplicado = { ...lote, ...importacaoAplicada, inspecao: lote.inspecao };
+      const estado = reconstruirEstadoPersistido(importacaoAplicada, lote.inspecao);
+      setLote(loteAplicado);
+      setConfiguracao(estado.configuracaoRestaurada);
+      setMapeamentos(estado.mapeamentosRestaurados);
+      setDecisoesEntidades(estado.decisoesRestauradas);
+      setModoConfiguracao('APLICADO');
+
+      try {
+        const respostaValidacao = await api.post(
+          `/importacoes/${lote.id}/validar`,
+          {
+            configuracao_leitura: importacaoAplicada.configuracao_leitura,
+            mapeamento: importacaoAplicada.mapeamento,
+          },
+        );
+        setValidacao(respostaValidacao);
+        setMensagem({
+          tipo: respostaValidacao.quantidade_erros
+            ? 'erro'
+            : (respostaValidacao.quantidade_alertas ? 'alerta' : 'sucesso'),
+          texto: respostaValidacao.quantidade_erros
+            ? 'A configuração foi aplicada. Revise as pendências encontradas.'
+            : 'Configuração aplicada e validação concluída.',
+        });
+      } catch (erroValidacao) {
+        setModoConfiguracao('MANUAL');
+        setMensagem({
+          tipo: 'erro',
+          texto: `${erroValidacao.message} Revise o mapeamento manualmente.`,
+        });
+      }
+    } catch (erro) {
+      setMensagem({
+        tipo: 'erro',
+        texto: erro.status === 409
+          ? `${erro.message} Você pode mapear o arquivo manualmente.`
+          : erro.message,
+      });
+    } finally {
+      setProcessando(false);
+    }
+  }
+
   async function continuarImportacao(importacao) {
     setProcessando(true);
     setMensagem(null);
@@ -237,18 +358,25 @@ export function ImportacoesPage() {
     try {
       const inspecao = await api.get(`/importacoes/${importacao.id}/inspecao`);
       const loteRestaurado = { ...importacao, inspecao };
-      const configuracaoRestaurada = restaurarConfiguracaoImportacao(importacao.configuracao_leitura, inspecao, importacao.tipo_arquivo);
-      const previewRestaurado = importacao.tipo_arquivo === 'CSV'
-        ? inspecao.preview || []
-        : inspecao.abas?.find((item) => item.nome === configuracaoRestaurada.aba)?.preview || inspecao.abas?.[0]?.preview || [];
+      const estado = importacao.mapeamento?.colunas?.length
+        ? reconstruirEstadoPersistido(importacao, inspecao)
+        : null;
+      const configuracaoRestaurada = estado?.configuracaoRestaurada
+        || restaurarConfiguracaoImportacao(importacao.configuracao_leitura, inspecao, importacao.tipo_arquivo);
+      const previewRestaurado = estado?.previewRestaurado || (
+        importacao.tipo_arquivo === 'CSV'
+          ? inspecao.preview || []
+          : inspecao.abas?.find((item) => item.nome === configuracaoRestaurada.aba)?.preview
+            || inspecao.abas?.[0]?.preview || []
+      );
       setLote(loteRestaurado);
       setConfiguracao(configuracaoRestaurada);
       setResultado(null);
       if (importacao.mapeamento?.colunas?.length) {
-        const mapeamentosRestaurados = restaurarMapeamentosImportacao(importacao.mapeamento, previewRestaurado[0] || []);
-        const decisoesRestauradas = restaurarDecisoesEntidades(importacao.mapeamento.decisoes_entidades);
+        const { mapeamentosRestaurados, decisoesRestauradas } = estado;
         setMapeamentos(mapeamentosRestaurados);
         setDecisoesEntidades(decisoesRestauradas);
+        setModoConfiguracao(importacao.perfil_importacao_id ? 'APLICADO' : 'MANUAL');
         try {
           const resposta = await api.post(
             `/importacoes/${importacao.id}/validar`,
@@ -262,6 +390,7 @@ export function ImportacoesPage() {
         }
       } else {
         setValidacao(null);
+        setModoConfiguracao('MANUAL');
         prepararMapeamento(previewRestaurado, importacao.tipo_arquivo, inspecao);
         setConfiguracao(configuracaoRestaurada);
         setMensagem({ tipo: 'sucesso', texto: 'Importação retomada. Confirme o mapeamento das colunas.' });
@@ -283,6 +412,9 @@ export function ImportacoesPage() {
     setDecisoesEntidades({});
     setErrosMapeamento({});
     setErrosEntidades({});
+    setModoConfiguracao('MANUAL');
+    setReconhecimentoPerfil(null);
+    setPerfilSelecionadoId('');
   }
 
   async function confirmarDescarte() {
@@ -413,6 +545,30 @@ export function ImportacoesPage() {
     }
   }
 
+  async function salvarConfiguracao(evento) {
+    evento.preventDefault();
+    const nome = nomePerfil.trim();
+    if (!nome) {
+      setErroNomePerfil('Informe o nome da configuração.');
+      return;
+    }
+    setProcessando(true);
+    setErroNomePerfil('');
+    try {
+      const perfil = await api.post('/perfis-importacao', {
+        importacao_id: resultado.id,
+        nome,
+      });
+      setPerfilSalvo(perfil);
+      setFormularioPerfilAberto(false);
+      setMensagem(null);
+    } catch (erro) {
+      setErroNomePerfil(erro.message);
+    } finally {
+      setProcessando(false);
+    }
+  }
+
   function reiniciar() {
     setArquivo(null);
     setLote(null);
@@ -427,6 +583,13 @@ export function ImportacoesPage() {
     setNovoGrupo({ nome: '', descricao: '' });
     setErroGrupo('');
     setGrupoDuplicado(null);
+    setModoConfiguracao('MANUAL');
+    setReconhecimentoPerfil(null);
+    setPerfilSelecionadoId('');
+    setFormularioPerfilAberto(false);
+    setNomePerfil('');
+    setErroNomePerfil('');
+    setPerfilSalvo(null);
     setMensagem(null);
   }
 
@@ -481,6 +644,41 @@ export function ImportacoesPage() {
             <div className="tabela-container tabela-preview"><table><tbody>{preview.map((linha, indiceLinha) => <tr key={indiceLinha}>{linha.map((celula, indiceColuna) => <td key={indiceColuna} className={indiceLinha === 0 ? 'preview-cabecalho' : ''}>{celula === null || celula === '' ? <span className="celula-vazia">vazio</span> : String(celula)}</td>)}</tr>)}</tbody></table></div>
           </section>
 
+          {modoConfiguracao === 'RECONHECENDO' && (
+            <section className="painel perfil-reconhecido">
+              <FileSearch aria-hidden="true" />
+              <div><span className="sobretitulo">Configuração</span><h2>Procurando configuração conhecida…</h2></div>
+            </section>
+          )}
+
+          {modoConfiguracao === 'PERFIL' && reconhecimentoPerfil && (
+            <section className="painel perfil-reconhecido">
+              <CheckCircle2 aria-hidden="true" />
+              <div>
+                <span className="sobretitulo">Caminho rápido</span>
+                <h2>{reconhecimentoPerfil.resultado === 'AMBIGUO'
+                  ? 'Mais de uma configuração corresponde a este arquivo.'
+                  : 'Configuração conhecida encontrada'}</h2>
+                {reconhecimentoPerfil.resultado === 'COMPATIVEL' && (
+                  <p>Nome: <strong>{reconhecimentoPerfil.perfil_sugerido.nome}</strong> · Versão: <strong>{reconhecimentoPerfil.perfil_sugerido.versao}</strong></p>
+                )}
+                {reconhecimentoPerfil.resultado === 'AMBIGUO' && (
+                  <label>Configuração
+                    <select aria-label="Configuração conhecida" value={perfilSelecionadoId} onChange={(evento) => setPerfilSelecionadoId(evento.target.value)}>
+                      <option value="">Selecione</option>
+                      {reconhecimentoPerfil.candidatos.map((perfil) => <option key={perfil.id} value={perfil.id}>{perfil.nome} · versão {perfil.versao}</option>)}
+                    </select>
+                  </label>
+                )}
+              </div>
+              <div className="formulario__acoes">
+                <button className="botao botao--primario" disabled={!perfilSelecionadoId || processando} onClick={usarConfiguracaoConhecida}>{processando ? 'APLICANDO…' : 'USAR CONFIGURAÇÃO'}</button>
+                <button className="botao botao--texto" disabled={processando} onClick={mapearManualmente}>MAPEAR MANUALMENTE</button>
+              </div>
+            </section>
+          )}
+
+          {modoConfiguracao === 'MANUAL' && (
           <section className="painel">
             <div className="painel__cabecalho painel__cabecalho--simples"><div><span className="sobretitulo">Etapa 2</span><h2>Mapeie as colunas</h2><p>As sugestões são iniciais. Confirme cada papel explicitamente.</p></div></div>
             <div className="mapa-colunas">
@@ -512,6 +710,7 @@ export function ImportacoesPage() {
             <p className="nota-interface">As escolhas desta etapa apenas planejam a importação. Novos indicadores serão criados somente após a validação e a confirmação do lote.</p>
             <div className="formulario__acoes"><button className="botao botao--primario" onClick={validar} disabled={processando}>{processando ? 'VALIDANDO…' : 'VALIDAR SEM GRAVAR'}</button></div>
           </section>
+          )}
         </>
       )}
 
@@ -549,6 +748,20 @@ export function ImportacoesPage() {
           <h2>Importação concluída</h2>
           <strong>{resultado.observacoes_criadas} observação(ões) criada(s)</strong>
           <p>Lote #{resultado.id} · {resultado.nome_arquivo_original} · status {resultado.status}</p>
+          {!perfilSalvo && !formularioPerfilAberto && <button className="botao botao--primario" onClick={() => setFormularioPerfilAberto(true)}>SALVAR CONFIGURAÇÃO</button>}
+          {formularioPerfilAberto && (
+            <form className="formulario salvar-perfil" onSubmit={salvarConfiguracao}>
+              <label>Nome da configuração *
+                <input aria-label="Nome da configuração" value={nomePerfil} onChange={(evento) => { setNomePerfil(evento.target.value); setErroNomePerfil(''); }} placeholder="Ex.: Importação mensal" />
+              </label>
+              {erroNomePerfil && <p className="entidade-decisao__erro" role="alert">{erroNomePerfil}</p>}
+              <div className="formulario__acoes">
+                <button className="botao botao--primario" disabled={processando}>{processando ? 'SALVANDO…' : 'SALVAR'}</button>
+                <button type="button" className="botao botao--texto" disabled={processando} onClick={() => { setFormularioPerfilAberto(false); setErroNomePerfil(''); }}>CANCELAR</button>
+              </div>
+            </form>
+          )}
+          {perfilSalvo && <p className="perfil-salvo"><CheckCircle2 aria-hidden="true" />Configuração salva para próximas importações.</p>}
           <button className="botao botao--secundario" onClick={reiniciar}>Importar outro arquivo</button>
         </section>
       )}

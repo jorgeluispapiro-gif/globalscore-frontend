@@ -841,6 +841,32 @@
   font-style: italic;
 }
 
+.perfil-reconhecido {
+  display: grid;
+  align-items: center;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-4);
+  border-left: 4px solid var(--color-primary-600);
+}
+
+.perfil-reconhecido > svg {
+  width: 2rem;
+  height: 2rem;
+  color: var(--color-primary-600);
+}
+
+.perfil-reconhecido h2,
+.perfil-reconhecido p {
+  margin-bottom: 0;
+}
+
+.perfil-reconhecido label {
+  display: grid;
+  max-width: 28rem;
+  margin-top: var(--space-3);
+  gap: var(--space-1);
+}
+
 .mapa-colunas {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1122,6 +1148,24 @@
   font: 700 2rem var(--font-display);
 }
 
+.salvar-perfil {
+  width: min(100%, 32rem);
+  margin-top: var(--space-3);
+  text-align: left;
+}
+
+.perfil-salvo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-green-500);
+  font-weight: var(--weight-semibold);
+}
+
+.perfil-salvo svg {
+  width: 1.2rem;
+}
+
 @media (max-width: 1100px) {
   :root { --sidebar-width: 14rem; }
   .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1179,6 +1223,8 @@
   .resumo-validacao { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .confirmacao-alertas { grid-template-columns: auto 1fr; }
   .confirmacao-alertas .botao { grid-column: 1 / -1; }
+  .perfil-reconhecido { grid-template-columns: auto 1fr; }
+  .perfil-reconhecido .formulario__acoes { grid-column: 1 / -1; }
 }
 
 @media (max-width: 560px) {

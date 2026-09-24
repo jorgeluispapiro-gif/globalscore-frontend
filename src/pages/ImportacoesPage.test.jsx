@@ -62,6 +62,7 @@ describe('indicadores dentro da importação', () => {
     let validacoes = 0;
     enviar.mockImplementation((caminho) => {
       if (caminho === '/importacoes') return Promise.resolve({ id: 9, tipo_arquivo: 'CSV', nome_arquivo_original: 'dados.csv', inspecao: { sugestao_delimitador: ';', preview: [['codigo', 'periodo', 'produtividade'], ['U01', '01/2026', '98']] } });
+      if (caminho.endsWith('/reconhecer-perfil')) return Promise.resolve({ resultado: 'INCOMPATIVEL', perfil_sugerido: null });
       validacoes += 1;
       if (validacoes === 1) return Promise.resolve({ quantidade_erros: 6, quantidade_alertas: 0, linhas_lidas: 6, observacoes_a_criar: 0, status: 'COM_ERROS', erros: Array.from({ length: 6 }, (_, indice) => ({ tipo: 'ENTIDADE_DESCONHECIDA', valor_original: 'U01', linha: indice + 2, mensagem: 'Entidade desconhecida' })), alertas: [] });
       return Promise.resolve({ quantidade_erros: 0, quantidade_alertas: 0, linhas_lidas: 6, observacoes_a_criar: 6, entidades_reconhecidas: 1, novas_entidades: [], status: 'VALIDADA', erros: [], alertas: [] });
@@ -84,7 +85,7 @@ describe('indicadores dentro da importação', () => {
     fireEvent.click(screen.getByRole('button', { name: 'REVALIDAR DADOS' }));
     expect(await screen.findByText('Defina como esta entidade deve ser tratada.')).toBeInTheDocument();
     expect(screen.getByText('Revise as entidades pendentes antes de revalidar.')).toBeInTheDocument();
-    expect(enviar).toHaveBeenCalledTimes(2);
+    expect(enviar).toHaveBeenCalledTimes(3);
 
     fireEvent.change(screen.getByLabelText('Decisão para a entidade U01'), { target: { value: 'ASSOCIAR' } });
     const seletor = screen.getByLabelText('Entidade existente para U01');
@@ -92,12 +93,12 @@ describe('indicadores dentro da importação', () => {
     expect(within(seletor).queryByText(/Inativa/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'REVALIDAR DADOS' }));
     expect(await screen.findByText('Selecione a entidade existente.')).toBeInTheDocument();
-    expect(enviar).toHaveBeenCalledTimes(2);
+    expect(enviar).toHaveBeenCalledTimes(3);
 
     fireEvent.change(seletor, { target: { value: '11' } });
     fireEvent.click(screen.getByRole('button', { name: 'REVALIDAR DADOS' }));
 
-    await waitFor(() => expect(enviar).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(enviar).toHaveBeenCalledTimes(4));
     const payload = enviar.mock.calls.at(-1)[1];
     expect(payload.mapeamento.decisoes_entidades).toEqual({ U01: { acao: 'ASSOCIAR', entidade_id: 11 } });
     expect(payload.mapeamento.colunas[2].indicador).toMatchObject({ acao: 'CRIAR', dados: { codigo: 'PROD' } });
