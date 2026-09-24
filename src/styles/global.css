@@ -454,6 +454,9 @@ input[type='file']::file-selector-button {
 }
 
 .status--ativo,
+.status--ativa,
+.status--valido,
+.status--calculada,
 .status--validada,
 .status--concluida {
   background: var(--color-green-100);
@@ -461,6 +464,9 @@ input[type='file']::file-selector-button {
 }
 
 .status--alerta,
+.status--processada,
+.status--incompleta,
+.status--ja_existente,
 .status--validada_com_alertas,
 .status--rascunho {
   background: var(--color-amber-100);
@@ -468,6 +474,9 @@ input[type='file']::file-selector-button {
 }
 
 .status--erro,
+.status--sem_dados,
+.status--sem_variabilidade,
+.status--substituida,
 .status--inativo,
 .status--arquivado {
   background: var(--color-red-100);
