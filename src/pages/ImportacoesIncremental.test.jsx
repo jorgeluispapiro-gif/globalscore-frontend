@@ -176,6 +176,60 @@ describe('importação incremental exata', () => {
     expect(enviar.mock.calls.some(([caminho]) => caminho.endsWith('/validar'))).toBe(true);
   });
 
+  it('não oferece salvar configuração quando a importação concluída já usou um perfil', async () => {
+    enviar.mockImplementation((caminho) => {
+      if (caminho === '/importacoes') return Promise.resolve(loteEnviado);
+      if (caminho.endsWith('/reconhecer-perfil')) {
+        return Promise.resolve({
+          resultado: 'COMPATIVEL',
+          perfil_sugerido: { id: 4, nome: 'Importação mensal', versao: 1 },
+        });
+      }
+      if (caminho.endsWith('/aplicar-perfil')) {
+        return Promise.resolve({
+          resultado: 'APLICADO',
+          importacao: {
+            ...loteEnviado,
+            perfil_importacao_id: 4,
+            configuracao_leitura: configuracaoLeitura,
+            mapeamento,
+          },
+        });
+      }
+      if (caminho.endsWith('/validar')) {
+        return Promise.resolve({
+          quantidade_erros: 0,
+          quantidade_alertas: 0,
+          linhas_lidas: 1,
+          observacoes_a_criar: 1,
+          entidades_reconhecidas: 1,
+          novas_entidades: [],
+          erros: [],
+          alertas: [],
+          status: 'VALIDADA',
+        });
+      }
+      if (caminho.endsWith('/confirmar')) {
+        return Promise.resolve({
+          id: 9,
+          status: 'CONCLUIDA',
+          observacoes_criadas: 1,
+          nome_arquivo_original: 'fevereiro.csv',
+          perfil_importacao_id: 4,
+        });
+      }
+      return Promise.resolve({});
+    });
+
+    render(<ImportacoesPage />);
+    await selecionarArquivo();
+    await act(async () => fireEvent.click(await screen.findByRole('button', { name: 'USAR CONFIGURAÇÃO' })));
+    await act(async () => fireEvent.click(await screen.findByRole('button', { name: 'CONFIRMAR IMPORTAÇÃO' })));
+
+    expect(await screen.findByText('Importação concluída')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'SALVAR CONFIGURAÇÃO' })).not.toBeInTheDocument();
+  });
+
   it('mantém o mapeamento manual quando a estrutura é incompatível', async () => {
     enviar.mockImplementation((caminho) => {
       if (caminho === '/importacoes') return Promise.resolve(loteEnviado);

@@ -748,7 +748,7 @@ export function ImportacoesPage() {
           <h2>Importação concluída</h2>
           <strong>{resultado.observacoes_criadas} observação(ões) criada(s)</strong>
           <p>Lote #{resultado.id} · {resultado.nome_arquivo_original} · status {resultado.status}</p>
-          {!perfilSalvo && !formularioPerfilAberto && <button className="botao botao--primario" onClick={() => setFormularioPerfilAberto(true)}>SALVAR CONFIGURAÇÃO</button>}
+          {resultado.perfil_importacao_id == null && !perfilSalvo && !formularioPerfilAberto && <button className="botao botao--primario" onClick={() => setFormularioPerfilAberto(true)}>SALVAR CONFIGURAÇÃO</button>}
           {formularioPerfilAberto && (
             <form className="formulario salvar-perfil" onSubmit={salvarConfiguracao}>
               <label>Nome da configuração *
