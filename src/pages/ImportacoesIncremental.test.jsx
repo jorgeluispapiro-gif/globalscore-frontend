@@ -54,6 +54,42 @@ const mapeamento = {
   decisoes_entidades: {},
 };
 
+const loteComDiferencas = {
+  ...loteEnviado,
+  nome_arquivo_original: 'fevereiro-alterado.csv',
+  inspecao: {
+    sugestao_delimitador: ';',
+    preview: [
+      ['periodo', 'codigo', 'vendas', 'qualidade'],
+      ['02/2026', 'U01', '110', '95'],
+    ],
+  },
+};
+
+const reconhecimentoComDiferencas = {
+  resultado: 'COMPATIVEL_COM_DIFERENCAS',
+  perfil_sugerido: { id: 4, nome: 'Importação mensal', versao: 1 },
+  diferencas: [
+    { tipo: 'COLUNA_NOVA', indice_coluna: 4, nome: 'qualidade' },
+    { tipo: 'COLUNA_REMOVIDA', indice_coluna: 4, nome: 'regiao' },
+    { tipo: 'ORDEM_ALTERADA' },
+  ],
+  configuracao_leitura_sugerida: configuracaoLeitura,
+  mapeamento_sugerido: {
+    formato: 'LARGO',
+    colunas: [
+      { indice_coluna: 1, papel: 'PERIODO' },
+      { indice_coluna: 2, papel: 'CODIGO_ENTIDADE' },
+      {
+        indice_coluna: 3,
+        papel: 'VALOR_INDICADOR',
+        indicador: { acao: 'EXISTENTE', indicador_id: 7 },
+      },
+    ],
+    decisoes_entidades: {},
+  },
+};
+
 async function selecionarArquivo() {
   const campo = await screen.findByLabelText('Arquivo de dados');
   fireEvent.change(campo, {
@@ -66,7 +102,18 @@ describe('importação incremental exata', () => {
   beforeEach(() => {
     obter.mockReset();
     enviar.mockReset();
-    obter.mockResolvedValue([]);
+    obter.mockImplementation((caminho) => caminho.startsWith('/indicadores')
+      ? Promise.resolve([{
+        id: 7,
+        codigo: 'VENDAS',
+        nome: 'Vendas',
+        unidade_medida: 'R$',
+        direcao: 'MAIOR_MELHOR',
+        peso_percentual: 100,
+        participa_global_score: true,
+        ativo: true,
+      }])
+      : Promise.resolve([]));
   });
 
   it('salva opcionalmente uma configuração depois da confirmação', async () => {
@@ -244,6 +291,88 @@ describe('importação incremental exata', () => {
     expect(await screen.findByText('Mapeie as colunas')).toBeInTheDocument();
     expect(screen.getByLabelText('Mapeamento da coluna vendas')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'USAR CONFIGURAÇÃO' })).not.toBeInTheDocument();
+    expect(enviar.mock.calls.some(([caminho]) => caminho.endsWith('/aplicar-perfil'))).toBe(false);
+  });
+
+  it('mostra as diferenças e reaproveita somente os mapeamentos seguros', async () => {
+    enviar.mockImplementation((caminho) => {
+      if (caminho === '/importacoes') return Promise.resolve(loteComDiferencas);
+      if (caminho.endsWith('/reconhecer-perfil')) return Promise.resolve(reconhecimentoComDiferencas);
+      return Promise.resolve({});
+    });
+
+    render(<ImportacoesPage />);
+    await selecionarArquivo();
+    expect(await screen.findByText('Configuração conhecida com alterações')).toBeInTheDocument();
+    expect(screen.getByText('Importação mensal')).toBeInTheDocument();
+    expect(screen.getByText('Nova coluna no arquivo: qualidade')).toBeInTheDocument();
+    expect(screen.getByText('Coluna existente na configuração não está mais presente: regiao')).toBeInTheDocument();
+    expect(screen.getByText('Ordem das colunas mudou')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'REVISAR E REAPROVEITAR' }));
+    expect(await screen.findByText('Revise o mapeamento')).toBeInTheDocument();
+    expect(screen.getByLabelText('Mapeamento da coluna periodo')).toHaveValue('PERIODO');
+    expect(screen.getByLabelText('Mapeamento da coluna codigo')).toHaveValue('CODIGO_ENTIDADE');
+    expect(screen.getByLabelText('Mapeamento da coluna vendas')).toHaveValue('ASSOCIAR_INDICADOR');
+    expect(screen.getByLabelText('Indicador existente da coluna vendas')).toHaveValue('7');
+    expect(enviar.mock.calls.some(([caminho]) => caminho.endsWith('/aplicar-perfil'))).toBe(false);
+  });
+
+  it('mantém coluna nova pendente e bloqueia a validação até a decisão', async () => {
+    enviar.mockImplementation((caminho) => {
+      if (caminho === '/importacoes') return Promise.resolve(loteComDiferencas);
+      if (caminho.endsWith('/reconhecer-perfil')) return Promise.resolve(reconhecimentoComDiferencas);
+      if (caminho.endsWith('/validar')) {
+        return Promise.resolve({
+          quantidade_erros: 0,
+          quantidade_alertas: 0,
+          linhas_lidas: 1,
+          observacoes_a_criar: 2,
+          entidades_reconhecidas: 1,
+          novas_entidades: [],
+          erros: [],
+          alertas: [],
+          status: 'VALIDADA',
+        });
+      }
+      return Promise.resolve({});
+    });
+
+    render(<ImportacoesPage />);
+    await selecionarArquivo();
+    fireEvent.click(await screen.findByRole('button', { name: 'REVISAR E REAPROVEITAR' }));
+    const seletorQualidade = screen.getByLabelText('Mapeamento da coluna qualidade');
+    expect(seletorQualidade).toHaveValue('');
+    expect(screen.getByText('Coluna 4 · Pendente')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'VALIDAR SEM GRAVAR' }));
+    expect(await screen.findByText('Selecione a função desta coluna.')).toBeInTheDocument();
+    expect(enviar.mock.calls.filter(([caminho]) => caminho.endsWith('/validar'))).toHaveLength(0);
+
+    fireEvent.change(seletorQualidade, { target: { value: 'IGNORAR' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'VALIDAR SEM GRAVAR' })));
+    await waitFor(() => expect(enviar.mock.calls.filter(([caminho]) => caminho.endsWith('/validar'))).toHaveLength(1));
+    const payload = enviar.mock.calls.find(([caminho]) => caminho.endsWith('/validar'))[1];
+    expect(payload.configuracao_leitura.colunas_utilizadas).toEqual([1, 2, 3, 4]);
+    expect(payload.mapeamento.colunas).toContainEqual({ indice_coluna: 4, papel: 'IGNORAR' });
+  });
+
+  it('mapeia do zero no mesmo lote sem aplicar o perfil parcial', async () => {
+    enviar.mockImplementation((caminho) => {
+      if (caminho === '/importacoes') return Promise.resolve(loteComDiferencas);
+      if (caminho.endsWith('/reconhecer-perfil')) return Promise.resolve(reconhecimentoComDiferencas);
+      return Promise.resolve({});
+    });
+
+    render(<ImportacoesPage />);
+    await selecionarArquivo();
+    fireEvent.click(await screen.findByRole('button', { name: 'MAPEAR DO ZERO' }));
+
+    expect(await screen.findByText('Mapeie as colunas')).toBeInTheDocument();
+    expect(screen.getByText('fevereiro-alterado.csv')).toBeInTheDocument();
+    expect(screen.getByLabelText('Mapeamento da coluna periodo')).toHaveValue('PERIODO');
+    expect(screen.getByLabelText('Mapeamento da coluna qualidade')).toHaveValue('IGNORAR');
+    expect(enviar.mock.calls.filter(([caminho]) => caminho === '/importacoes')).toHaveLength(1);
     expect(enviar.mock.calls.some(([caminho]) => caminho.endsWith('/aplicar-perfil'))).toBe(false);
   });
 });

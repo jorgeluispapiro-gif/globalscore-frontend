@@ -29,6 +29,11 @@ export function validarIndicadoresMapeados(mapeamentos) {
   const erros = {};
 
   for (const item of mapeamentos) {
+    if (!item.selecao) {
+      erros[item.indice_coluna] = ['Selecione a função desta coluna.'];
+      continue;
+    }
+
     if (item.selecao === SELECAO_INDICADOR_EXISTENTE && !item.indicador_existente_id) {
       erros[item.indice_coluna] = ['Selecione o indicador que corresponde a esta coluna.'];
     }
@@ -99,6 +104,7 @@ export function resumirMetricas(mapeamentos, indicadores) {
   const existentes = metricas.filter((item) => item.selecao === SELECAO_INDICADOR_EXISTENTE);
   const novos = metricas.filter((item) => item.selecao === SELECAO_INDICADOR_NOVO);
   const ignorados = metricas.filter((item) => item.selecao === 'IGNORAR');
+  const pendentes = metricas.filter((item) => !item.selecao);
   const detalhes = metricas.map((item) => {
     if (item.selecao === SELECAO_INDICADOR_EXISTENTE) {
       const indicador = indicadores.find((registro) => String(registro.id) === String(item.indicador_existente_id));
@@ -108,10 +114,13 @@ export function resumirMetricas(mapeamentos, indicadores) {
       const dados = item.novo_indicador || {};
       return { indice_coluna: item.indice_coluna, coluna: item.nome, descricao: `${dados.codigo || 'Sem código'} · ${dados.nome || 'Sem nome'} · novo` };
     }
+    if (!item.selecao) {
+      return { indice_coluna: item.indice_coluna, coluna: item.nome, descricao: 'pendente de decisão' };
+    }
     return { indice_coluna: item.indice_coluna, coluna: item.nome, descricao: 'ignorada' };
   });
 
-  return { total: metricas.length, associados: existentes.length, novos: novos.length, ignorados: ignorados.length, detalhes };
+  return { total: metricas.length, associados: existentes.length, novos: novos.length, ignorados: ignorados.length, pendentes: pendentes.length, detalhes };
 }
 
 export function calcularPesoPlanejado(indicadores, mapeamentos) {

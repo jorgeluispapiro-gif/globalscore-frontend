@@ -32,6 +32,19 @@ function sugerirPapel(cabecalho) {
   return 'IGNORAR';
 }
 
+const ROTULOS_DIFERENCAS = {
+  COLUNA_NOVA: 'Nova coluna no arquivo',
+  COLUNA_REMOVIDA: 'Coluna existente na configuração não está mais presente',
+  ORDEM_ALTERADA: 'Ordem das colunas mudou',
+  REFERENCIA_INVALIDA: 'Um cadastro usado pela configuração precisa ser revisto',
+};
+
+function descreverDiferenca(diferenca) {
+  const rotulo = ROTULOS_DIFERENCAS[diferenca.tipo] || diferenca.tipo;
+  if (diferenca.nome) return `${rotulo}: ${diferenca.nome}`;
+  return rotulo;
+}
+
 function ListaOcorrencias({ titulo, itens, tipo }) {
   if (!itens?.length) return null;
   const Icone = tipo === 'erro' ? ShieldAlert : AlertTriangle;
@@ -146,6 +159,9 @@ export function ImportacoesPage() {
   }, [lote, configuracao.aba]);
 
   const cabecalhos = preview[0] || [];
+  const possuiReferenciaInvalida = reconhecimentoPerfil?.diferencas?.some(
+    (item) => item.tipo === 'REFERENCIA_INVALIDA',
+  );
   const resumoMetricas = useMemo(
     () => resumirMetricas(mapeamentos, indicadores),
     [mapeamentos, indicadores],
@@ -204,6 +220,9 @@ export function ImportacoesPage() {
         if (reconhecimento.resultado === 'COMPATIVEL') {
           setPerfilSelecionadoId(String(reconhecimento.perfil_sugerido.id));
           setModoConfiguracao('PERFIL');
+          setMensagem(null);
+        } else if (reconhecimento.resultado === 'COMPATIVEL_COM_DIFERENCAS') {
+          setModoConfiguracao('DIFERENCAS');
           setMensagem(null);
         } else if (reconhecimento.resultado === 'AMBIGUO') {
           setModoConfiguracao('PERFIL');
@@ -296,6 +315,64 @@ export function ImportacoesPage() {
   function mapearManualmente() {
     setModoConfiguracao('MANUAL');
     setMensagem({ tipo: 'sucesso', texto: 'Mapeamento manual disponível para este lote.' });
+  }
+
+  function revisarConfiguracaoComDiferencas() {
+    const configuracaoRestaurada = restaurarConfiguracaoImportacao(
+      reconhecimentoPerfil.configuracao_leitura_sugerida,
+      lote.inspecao,
+      lote.tipo_arquivo,
+    );
+    const previewAtual = lote.tipo_arquivo === 'CSV'
+      ? lote.inspecao.preview || []
+      : lote.inspecao.abas?.find((item) => item.nome === configuracaoRestaurada.aba)?.preview
+        || lote.inspecao.abas?.[0]?.preview || [];
+    const cabecalhosAtuais = previewAtual[0] || [];
+    const restaurados = restaurarMapeamentosImportacao(
+      reconhecimentoPerfil.mapeamento_sugerido,
+      cabecalhosAtuais,
+    );
+    const porIndice = new Map(restaurados.map((item) => [item.indice_coluna, item]));
+    const indicadoresAtivos = new Set(indicadores.map((item) => String(item.id)));
+    const mapeamentosRevisao = cabecalhosAtuais.map((nome, indice) => {
+      const indiceColuna = indice + 1;
+      const reaproveitado = porIndice.get(indiceColuna);
+      if (reaproveitado) {
+        if (
+          reaproveitado.selecao === SELECAO_INDICADOR_EXISTENTE
+          && !indicadoresAtivos.has(String(reaproveitado.indicador_existente_id))
+        ) {
+          return { ...reaproveitado, indicador_existente_id: '' };
+        }
+        return reaproveitado;
+      }
+      return {
+        indice_coluna: indiceColuna,
+        nome: String(nome || `Coluna ${indiceColuna}`),
+        selecao: '',
+        candidata_metrica: true,
+        indicador_existente_id: '',
+        novo_indicador: criarDadosNovoIndicador(nome),
+      };
+    });
+    const decisoesRestauradas = restaurarDecisoesEntidades(
+      reconhecimentoPerfil.mapeamento_sugerido?.decisoes_entidades,
+    );
+    const entidadesAtivas = new Set(entidades.map((item) => String(item.id)));
+    const decisoesSeguras = Object.fromEntries(
+      Object.entries(decisoesRestauradas).filter(([, decisao]) => (
+        decisao.acao !== 'ASSOCIAR'
+        || entidadesAtivas.has(String(decisao.entidade_id))
+      )),
+    );
+
+    setConfiguracao(configuracaoRestaurada);
+    setMapeamentos(mapeamentosRevisao);
+    setDecisoesEntidades(decisoesSeguras);
+    setErrosMapeamento({});
+    setValidacao(null);
+    setModoConfiguracao('REVISAO');
+    setMensagem(null);
   }
 
   async function usarConfiguracaoConhecida() {
@@ -678,16 +755,44 @@ export function ImportacoesPage() {
             </section>
           )}
 
-          {modoConfiguracao === 'MANUAL' && (
+          {modoConfiguracao === 'DIFERENCAS' && reconhecimentoPerfil && (
+            <section className="painel perfil-reconhecido perfil-reconhecido--alterado">
+              <AlertTriangle aria-hidden="true" />
+              <div>
+                <span className="sobretitulo">Revisão necessária</span>
+                <h2>Configuração conhecida com alterações</h2>
+                <p>Nome: <strong>{reconhecimentoPerfil.perfil_sugerido.nome}</strong> · Versão: <strong>{reconhecimentoPerfil.perfil_sugerido.versao}</strong></p>
+                <ul className="lista-diferencas">
+                  {reconhecimentoPerfil.diferencas.map((diferenca, indice) => (
+                    <li key={`${diferenca.tipo}-${diferenca.indice_coluna || indice}`}>
+                      {descreverDiferenca(diferenca)}
+                    </li>
+                  ))}
+                </ul>
+                {possuiReferenciaInvalida && (
+                  <p className="alerta-referencia">Esta configuração usa um indicador ou entidade que não está mais disponível. Revise os campos associados antes de validar.</p>
+                )}
+              </div>
+              <div className="formulario__acoes">
+                <button className="botao botao--primario" onClick={revisarConfiguracaoComDiferencas}>REVISAR E REAPROVEITAR</button>
+                <button className="botao botao--texto" onClick={mapearManualmente}>MAPEAR DO ZERO</button>
+              </div>
+            </section>
+          )}
+
+          {['MANUAL', 'REVISAO'].includes(modoConfiguracao) && (
           <section className="painel">
-            <div className="painel__cabecalho painel__cabecalho--simples"><div><span className="sobretitulo">Etapa 2</span><h2>Mapeie as colunas</h2><p>As sugestões são iniciais. Confirme cada papel explicitamente.</p></div></div>
+            <div className="painel__cabecalho painel__cabecalho--simples"><div><span className="sobretitulo">Etapa 2</span><h2>{modoConfiguracao === 'REVISAO' ? 'Revise o mapeamento' : 'Mapeie as colunas'}</h2><p>{modoConfiguracao === 'REVISAO' ? 'As correspondências seguras foram reaproveitadas. Decida como tratar as colunas pendentes.' : 'As sugestões são iniciais. Confirme cada papel explicitamente.'}</p></div></div>
+            {modoConfiguracao === 'REVISAO' && possuiReferenciaInvalida && (
+              <p className="alerta-referencia">Esta configuração usa um indicador ou entidade que não está mais disponível. Revise os campos associados antes de validar.</p>
+            )}
             <div className="mapa-colunas">
               {mapeamentos.map((item) => {
                 const nomeColuna = cabecalhos[item.indice_coluna - 1] || item.nome;
-                return <article className="mapa-colunas__item" key={item.indice_coluna}>
-                  <span>Coluna {item.indice_coluna}</span>
+                return <article className={`mapa-colunas__item ${!item.selecao ? 'mapa-colunas__item--pendente' : ''}`} key={item.indice_coluna}>
+                  <span>Coluna {item.indice_coluna}{!item.selecao ? ' · Pendente' : ''}</span>
                   <strong>{nomeColuna}</strong>
-                  <label>Função da coluna<select aria-label={`Mapeamento da coluna ${nomeColuna}`} value={item.selecao} onChange={(evento) => alterarMapeamento(item.indice_coluna, evento.target.value)}><option value="IGNORAR">Ignorar coluna</option><option value="CODIGO_ENTIDADE">Código da entidade</option><option value="NOME_ENTIDADE">Nome da entidade</option><option value="PERIODO">Período</option><option value={SELECAO_INDICADOR_EXISTENTE}>Associar a indicador existente</option><option value={SELECAO_INDICADOR_NOVO}>Criar novo indicador</option></select></label>
+                  <label>Função da coluna<select aria-label={`Mapeamento da coluna ${nomeColuna}`} value={item.selecao} onChange={(evento) => alterarMapeamento(item.indice_coluna, evento.target.value)}><option value="">Selecione a função</option><option value="IGNORAR">Ignorar coluna</option><option value="CODIGO_ENTIDADE">Código da entidade</option><option value="NOME_ENTIDADE">Nome da entidade</option><option value="PERIODO">Período</option><option value={SELECAO_INDICADOR_EXISTENTE}>Associar a indicador existente</option><option value={SELECAO_INDICADOR_NOVO}>Criar novo indicador</option></select></label>
                   {item.selecao === SELECAO_INDICADOR_EXISTENTE && <label>Indicador<select aria-label={`Indicador existente da coluna ${nomeColuna}`} value={item.indicador_existente_id} onChange={(evento) => alterarIndicadorExistente(item.indice_coluna, evento.target.value)}><option value="">Selecione</option>{indicadores.map((indicador) => <option key={indicador.id} value={indicador.id}>{indicador.nome} · {indicador.unidade_medida} · {indicador.direcao === 'MAIOR_MELHOR' ? 'Maior é melhor' : 'Menor é melhor'}</option>)}</select></label>}
                   {item.selecao === SELECAO_INDICADOR_NOVO && <div className="novo-indicador">
                     <label>Código<input aria-label={`Código do novo indicador da coluna ${nomeColuna}`} value={item.novo_indicador.codigo} onChange={(evento) => alterarNovoIndicador(item.indice_coluna, 'codigo', evento.target.value)} /></label>
@@ -703,7 +808,7 @@ export function ImportacoesPage() {
               })}
             </div>
             <section className="resumo-metricas" aria-label="Resumo das métricas">
-              <div><span className="sobretitulo">Métricas</span><h3>{resumoMetricas.total} coluna(s) de métricas identificada(s)</h3><p>{resumoMetricas.associados} associada(s) a indicadores existentes · {resumoMetricas.novos} novo(s) indicador(es) · {resumoMetricas.ignorados} ignorada(s)</p></div>
+              <div><span className="sobretitulo">Métricas</span><h3>{resumoMetricas.total} coluna(s) de métricas identificada(s)</h3><p>{resumoMetricas.associados} associada(s) a indicadores existentes · {resumoMetricas.novos} novo(s) indicador(es) · {resumoMetricas.ignorados} ignorada(s){resumoMetricas.pendentes > 0 ? ` · ${resumoMetricas.pendentes} pendente(s)` : ''}</p></div>
               <ul>{resumoMetricas.detalhes.map((item) => <li key={`${item.indice_coluna}-${item.coluna}`}><strong>{item.coluna}</strong><span>{item.descricao}</span></li>)}</ul>
               <div className={`peso-planejado ${Math.abs(pesoPlanejado - 100) < 0.001 ? 'peso-planejado--ok' : 'peso-planejado--alerta'}`}><span>Peso total planejado para o Global Score</span><strong>{pesoPlanejado.toLocaleString('pt-BR')}%</strong>{Math.abs(pesoPlanejado - 100) >= 0.001 && <small>O total está diferente de 100%. Revise os pesos antes de ativar uma Base de Referência.</small>}</div>
             </section>
