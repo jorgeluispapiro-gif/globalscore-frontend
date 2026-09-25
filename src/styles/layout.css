@@ -2047,6 +2047,156 @@
   letter-spacing: 0.04em;
 }
 
+.radar-comparativo__corpo {
+  display: grid;
+  min-height: 32rem;
+  grid-template-columns: minmax(16rem, 0.55fr) minmax(0, 1.45fr);
+}
+
+.radar-comparativo__seletor {
+  display: grid;
+  align-content: start;
+  padding: var(--space-5) var(--space-6);
+  border-right: var(--border);
+  background: var(--color-surface-soft);
+  gap: var(--space-4);
+}
+
+.radar-comparativo__seletor > div:first-child {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.radar-comparativo__seletor > div:first-child strong {
+  color: var(--color-navy-900);
+  font: 600 1rem var(--font-display);
+}
+
+.radar-comparativo__seletor small {
+  color: var(--color-muted);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.radar-comparativo__seletor > label {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text-soft);
+  font-size: 0.7rem;
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+}
+
+.radar-comparativo__seletor > label input {
+  min-height: 2.65rem;
+  padding: 0 var(--space-3);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--color-text);
+  font-size: 0.82rem;
+  text-transform: none;
+}
+
+.radar-comparativo__lista {
+  max-height: 21rem;
+  overflow-y: auto;
+  border: var(--border);
+  background: #fff;
+}
+
+.radar-comparativo__lista label {
+  display: grid;
+  min-height: 3.25rem;
+  align-items: center;
+  padding: var(--space-3);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  cursor: pointer;
+}
+
+.radar-comparativo__lista label + label {
+  border-top: var(--border);
+}
+
+.radar-comparativo__lista input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--color-primary-600);
+}
+
+.radar-comparativo__lista span {
+  overflow: hidden;
+  color: var(--color-navy-900);
+  font-size: 0.78rem;
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.radar-comparativo__lista b {
+  color: var(--color-primary-700);
+  font: 700 0.88rem var(--font-display);
+}
+
+.radar-comparativo__total {
+  color: var(--color-primary-700);
+  font-size: 0.74rem;
+}
+
+.radar-comparativo__grafico {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  padding: var(--space-4);
+}
+
+.radar-comparativo__erro,
+.radar-comparativo__nota {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.radar-comparativo__erro {
+  color: var(--color-red-600);
+}
+
+.radar-tooltip {
+  min-width: 12rem;
+  padding: var(--space-3);
+  border: var(--border);
+  background: rgb(255 255 255 / 96%);
+  box-shadow: var(--shadow-card);
+}
+
+.radar-tooltip > strong {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--color-navy-900);
+  font: 600 0.82rem var(--font-display);
+}
+
+.radar-tooltip > div {
+  display: grid;
+  align-items: center;
+  grid-template-columns: 0.55rem minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  color: var(--color-text-soft);
+  font-size: 0.74rem;
+}
+
+.radar-tooltip i {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+
+.radar-tooltip b {
+  color: var(--color-navy-900);
+}
+
 @media (max-width: 1180px) {
   .dashboard-cabecalho { grid-template-columns: 1fr; }
   .dashboard-filtros { width: min(100%, 34rem); }
@@ -2061,6 +2211,8 @@
   .dashboard-corpo { grid-template-columns: 1fr; }
   .dashboard-ranking { position: static; max-height: none; }
   .ranking-analitico { max-height: 24rem; }
+  .radar-comparativo__corpo { grid-template-columns: 1fr; }
+  .radar-comparativo__seletor { border-right: 0; border-bottom: var(--border); }
 }
 
 @media (max-width: 620px) {
@@ -2080,6 +2232,7 @@
   .indicador-diagnostico dl { grid-column: auto; }
   .secao-editorial__cabecalho { align-items: flex-start; flex-direction: column; }
   .secao-editorial__cabecalho small { text-align: left; }
+  .radar-comparativo__grafico { padding: var(--space-2); }
 }
 
 @media print {
@@ -2097,6 +2250,7 @@
   .topbar,
   .dashboard-filtros,
   .dashboard-ranking,
+  .radar-comparativo__seletor,
   .nao-imprimir {
     display: none !important;
   }

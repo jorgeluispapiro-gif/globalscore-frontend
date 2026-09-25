@@ -8,6 +8,7 @@ import { IndicatorDiagnosticList } from '../components/dashboard/IndicatorDiagno
 import { ExecutiveNote } from '../components/dashboard/ExecutiveNote';
 import { EntityEvents } from '../components/dashboard/EntityEvents';
 import { ScoreEvolutionChart } from '../components/charts/ScoreEvolutionChart';
+import { GraficoRadarComparativo } from '../components/charts/GraficoRadarComparativo';
 
 function periodoAtual() {
   const agora = new Date();
@@ -192,7 +193,13 @@ export function DashboardPage() {
       </section>
 
       {!base && <EstadoVazio titulo="Nenhuma Base de Referência ativa" descricao="Ative uma Base para consultar os resultados consolidados deste grupo." />}
-      {base && <section className="dashboard-corpo">
+      {base && <>
+        {base.modo === 'ENTRE_ENTIDADES' && <GraficoRadarComparativo
+          entidades={overview.ranking}
+          baseReferenciaId={overview.base_referencia_id}
+          periodo={periodo}
+        />}
+        <section className="dashboard-corpo">
         <aside className="dashboard-ranking" aria-labelledby="titulo-ranking">
           <div className="secao-editorial__cabecalho">
             <div><span>Comparação</span><h2 id="titulo-ranking">Ranking do período</h2></div>
@@ -230,7 +237,8 @@ export function DashboardPage() {
             </section>
           </>}
         </div>
-      </section>}
+        </section>
+      </>}
     </>}
   </div>;
 }

@@ -71,6 +71,14 @@ function detalhe(entidadeId, nome, score) {
         peso_aplicado: 60,
         contribuicao_score: 50.4,
       },
+      {
+        indicador_id: 2,
+        indicador_nome: 'Qualidade',
+        valor_observado: 94,
+        pontuacao_percentil: 76,
+        peso_aplicado: 40,
+        contribuicao_score: 30.4,
+      },
     ],
   };
 }
@@ -138,6 +146,25 @@ describe('Dashboard analítico macro para micro', () => {
 
     expect(obter.mock.calls.some(([caminho]) => caminho.includes('/avaliacoes/999'))).toBe(false);
     expect(obter.mock.calls.some(([caminho]) => caminho.startsWith('/analytics/overview?'))).toBe(true);
+  });
+
+  it('permite escolher unidades e compara seus indicadores no radar', async () => {
+    render(<DashboardPage />);
+
+    expect(await screen.findByRole('heading', { name: 'Comparação por indicadores' })).toBeInTheDocument();
+    const unidadeNorte = screen.getByRole('checkbox', { name: /Unidade Norte/ });
+    const unidadeCentro = screen.getByRole('checkbox', { name: /Unidade Centro/ });
+    await waitFor(() => expect(unidadeNorte).toBeChecked());
+    expect(unidadeCentro).not.toBeChecked();
+
+    fireEvent.click(unidadeCentro);
+
+    await waitFor(() => expect(obter).toHaveBeenCalledWith(expect.stringMatching(
+      /^\/analytics\/entidades\/101\?base_referencia_id=50&periodo=\d{4}-\d{2}$/,
+    )));
+    expect(screen.getByText('2 unidades selecionadas')).toBeInTheDocument();
+    expect(screen.getAllByText('Produtividade').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Qualidade').length).toBeGreaterThan(0);
   });
 
   it('carrega a entidade de referência sem criar ranking no modo histórico', async () => {
