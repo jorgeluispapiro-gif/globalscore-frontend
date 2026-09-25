@@ -1,12 +1,17 @@
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { EstadoVazio } from '../ui/Estados';
 
+function formatarScore(valor) {
+  if (valor === null || valor === undefined) return '—';
+  return Number(valor).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
 function EventosDaEvolucao({ dados }) {
   const periodosComEventos = dados.filter((item) => item.eventos?.length);
   if (!periodosComEventos.length) return null;
 
   return <ol className="evolucao-eventos" aria-label="Eventos associados à evolução">{periodosComEventos.map((item) => <li key={item.periodo}>
-    <div><time dateTime={item.periodo}>{item.periodo}</time><strong>Global Score {Number(item.global_score).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</strong></div>
+    <div><time dateTime={item.periodo}>{item.periodo}</time><strong>Global Score {formatarScore(item.global_score)}</strong></div>
     <ul>{item.eventos.map((evento) => <li key={evento.id}>{evento.titulo}</li>)}</ul>
   </li>)}</ol>;
 }

@@ -25,4 +25,13 @@ describe('estados vazios do dashboard', () => {
     render(<RankingPanel dados={[]} modoBase="HISTORICO_ENTIDADE" />);
     expect(screen.getByText('Ranking não aplicável')).toBeInTheDocument();
   });
+  it('não exibe "0,0" quando global_score do período é null', () => {
+    const dadosComNullScore = [
+      { periodo: '2026-07', global_score: 72.0, status: 'CALCULADA', eventos: [] },
+      { periodo: '2026-08', global_score: null, status: 'INCOMPLETA', eventos: [{ id: 1, titulo: 'Auditoria interna' }] },
+    ];
+    render(<ScoreEvolutionChart dados={dadosComNullScore} />);
+    expect(screen.getByText('Global Score —')).toBeInTheDocument();
+    expect(screen.queryByText(/Global Score 0,0/)).not.toBeInTheDocument();
+  });
 });
