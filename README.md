@@ -1,171 +1,296 @@
 # GlobalScore — Frontend Web
 
 > **MEASURE | COMPARE | ADVANCE**  
-> Interface web responsiva do MVP GlobalScore para avaliação multicritério comparativa de desempenho, importação assistida de dados, dashboard executivo macro-micro, ranking entre entidades, série histórica de evolução e exportação de relatórios.
+> Interface web responsiva do MVP GlobalScore para avaliação comparativa de desempenho, importação assistida de dados, dashboard executivo e exportação de relatório.
 
 ![Arquitetura do GlobalScore](docs/arquitetura.svg)
 
 ---
 
-## 1. Visão Geral e Escopo Final
+## 1. Visão geral
 
-O **GlobalScore Frontend** é a camada de apresentação e interação do ecossistema GlobalScore. Toda a lógica de cálculo (percentis, pesos, elegibilidade, réguas estatísticas e Global Score) permanece centralizada na [API Backend GlobalScore](https://github.com/jorgeluispapiro-gif/globalscore-api). O frontend é responsável por guiar a experiência do usuário e apresentar diagnósticos claros e acionáveis.
+O **GlobalScore Frontend** é a camada de apresentação e interação do sistema. A matemática de percentis, pesos e Global Score não é recalculada no navegador: os valores exibidos são produzidos pela API backend.
 
-### Funcionalidades Entregues no MVP Final:
-- **Autenticação & Sessão**: Login por e-mail e senha integrado ao Supabase Auth, persistência de sessão, logout e rotas protegidas por Bearer token;
-- **Gestão de Domínio**: Cadastro e edição visual de Projetos, Grupos de Comparação, Entidades e Indicadores (com suporte a desativação lógica);
-- **Importação Assistida Incremental**: Workflow completo de upload CSV/XLSX com preview, mapeamento dinâmico de colunas, dry-run estatístico com alerta de outliers por 3 IQR e gravação em lote transacional;
-- **Bases de Referência & Pesagem**: Visualização das estatísticas congeladas (min, máx, p10..p90) e interface de ajuste parametrizável de pesos dos indicadores;
-- **Avaliações**: Execução de avaliações individuais e disparo em lote para todas as entidades de um grupo/base;
-- **Dashboard Macro → Micro**:
-  - Exibição de Global Score (0,0 a 10,0) com faixas conceituais e ratings;
-  - Gráfico de Radar comparativo e Gráfico de Barras por indicador;
-  - Ranking relativo entre entidades da mesma base e período;
-  - Evolução histórica do Global Score ao longo do tempo por entidade;
-  - Filtro e storytelling por Story View (Modo Entidade / Modo Período);
-- **Eventos Gerenciais**: Exibição e registro de marcos de intervenção na linha do tempo;
-- **Nota Executiva Determinística**: Síntese diagnóstica gerada automaticamente a partir dos dados do período e histórico;
-- **Exportação A4**: Layout otimizado para impressão e geração de relatórios PDF executivos diretamente do navegador.
+### Funcionalidades entregues
 
----
+- autenticação por e-mail e senha via Supabase Auth;
+- sessão persistida, logout e rotas protegidas;
+- seleção e gestão de projetos;
+- consulta de grupos comparáveis;
+- gestão de entidades e indicadores;
+- importação assistida incremental de CSV/XLSX;
+- criação, processamento, ajuste de pesos e ativação de Bases de Referência;
+- processamento de avaliações em lote;
+- dashboard macro → micro;
+- ranking no modo `ENTRE_ENTIDADES`;
+- modo `HISTORICO_ENTIDADE` sem ranking artificial;
+- Global Score na escala **0 a 100**;
+- evolução temporal da entidade;
+- diagnóstico dos indicadores;
+- eventos gerenciais;
+- nota executiva determinística;
+- exportação de relatório A4 via impressão do navegador.
 
-## 2. Tecnologias Utilizadas
-
-- **Framework Web**: React 19, React Router 7
-- **Ferramenta de Build**: Vite 8
-- **Linguagem**: JavaScript (ESNext)
-- **Visualização de Dados / Gráficos**: Recharts
-- **Integração Auth Externa**: Supabase JavaScript Client (`@supabase/supabase-js`)
-- **Estilização**: CSS Nativo modular com Tokens (`tokens.css`, `layout.css`, `global.css`) e tipografia IBM Plex Sans
-- **Qualidade & Testes**: Vitest, React Testing Library, Oxlint
+O frontend não atribui ratings ou faixas conceituais nesta versão.
 
 ---
 
-## 3. Estrutura do Repositório
+## 2. Tecnologias
+
+- React 19
+- React Router
+- Vite 8
+- JavaScript
+- Recharts
+- Supabase JavaScript Client
+- CSS próprio
+- Vitest
+- React Testing Library
+- Oxlint
+- Docker
+
+---
+
+## 3. Estrutura
 
 ```text
 .
-├── Dockerfile                  # Containerização do frontend (Node Alpine + Vite)
-├── .dockerignore              # Exclusões para build Docker
-├── README.md                  # Documentação do frontend
-├── docs/                      # Documentos e diagramas de arquitetura (arquitetura.svg)
-├── public/                    # Assets estáticos e favicons
+├── Dockerfile
+├── .dockerignore
+├── README.md
+├── docs/
+│   └── arquitetura.svg
+├── public/
 ├── src/
-│   ├── assets/                # Logos e imagens da marca
+│   ├── assets/
 │   ├── components/
-│   │   ├── charts/            # Componentes Recharts (Radar, Barras, Evolução)
-│   │   ├── dashboard/         # Cards, Ranking, Timeline e Controles de Story View
-│   │   ├── layout/            # Shell principal, navegação e RotaProtegida
-│   │   └── ui/                # Estados de carregamento, erro, alerta e vazio
-│   ├── hooks/                 # Custom hooks (autenticação, projeto ativo)
-│   ├── pages/                 # Páginas roteáveis (Dashboard, Avaliacoes, Importacoes, etc.)
-│   ├── services/              # Cliente HTTP para API Flask (`api.js`) e Supabase Client (`supabase.js`)
-│   ├── styles/                # CSS Tokens, variáveis e estilos globais
-│   ├── test/                  # Configuração do Vitest
-│   └── utils/                 # Funções utilitárias e gerador de narrativa executiva
-└── vite.config.js             # Configuração do Vite e servidor de proxy local
+│   │   ├── charts/
+│   │   ├── dashboard/
+│   │   ├── layout/
+│   │   └── ui/
+│   ├── hooks/
+│   ├── pages/
+│   ├── services/
+│   ├── styles/
+│   ├── test/
+│   └── utils/
+└── vite.config.js
 ```
 
 ---
 
-## 4. Requisitos e Execução Local
+## 4. Execução local
 
 ### Pré-requisito
-- **Node.js**: versão 20.19.0 ou superior (desenvolvido e testado em Node.js 24 LTS).
 
-### Passo a Passo para Execução Local
+Node.js 20.19 ou superior.
 
-1. Instale as dependências:
-   ```bash
-   npm install
-   ```
+### Instalação
 
-2. Crie o arquivo `.env` a partir do exemplo fornecido:
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+npm install
+cp .env.example .env
+```
 
-3. Configure as variáveis de ambiente no `.env`:
-   ```dotenv
-   VITE_SUPABASE_URL=https://sua-instancia.supabase.co
-   VITE_SUPABASE_PUBLISHABLE_KEY=sua_publishable_key
-   VITE_GLOBALSCORE_API_URL=/api
-   VITE_GLOBALSCORE_PROXY_TARGET=http://127.0.0.1:5000
-   ```
+Configure o `.env`:
 
-4. Inicie o servidor de desenvolvimento:
-   ```bash
-   npm run dev
-   ```
+```dotenv
+VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sua-chave-publica
+VITE_GLOBALSCORE_API_URL=/api
+VITE_GLOBALSCORE_PROXY_TARGET=http://127.0.0.1:5000
+```
 
-Abra a aplicação em **`http://localhost:5173`**.
+Inicie:
 
-> **Como funciona o Proxy Local**: O Vite redireciona requisições iniciadas com `/api` para a URL configurada em `VITE_GLOBALSCORE_PROXY_TARGET` (`http://127.0.0.1:5000` por padrão). Isso elimina problemas de CORS durante o desenvolvimento local. O backend Flask deve estar rodando para atender as requisições.
+```bash
+npm run dev
+```
+
+A aplicação fica em `http://localhost:5173`.
+
+Durante o desenvolvimento, o Vite encaminha `/api` para `VITE_GLOBALSCORE_PROXY_TARGET`. O backend deve estar ativo para atender essas requisições.
 
 ---
 
-## 5. Comandos de Qualidade e Build
+## 5. Qualidade
 
-- **Executar Testes Automatizados**:
-  ```bash
-  npm test
-  ```
-  *(Suíte completa de ~38 testes cobrindo renderização de componentes, rotas protegidas, gráficos, tratamento de dados nulos e fluxos de importação)*
+```bash
+npm test
+npm run lint
+npm run build
+```
 
-- **Executar Linter**:
-  ```bash
-  npm run lint
-  ```
+Validação realizada no fechamento acadêmico:
 
-- **Gerar Build de Produção**:
-  ```bash
-  npm run build
-  ```
+- **14 arquivos de teste**
+- **62 testes automatizados passando**
+- **0 warnings e 0 erros no lint**
+- **build Vite concluído com sucesso**
 
 ---
 
-## 6. Execução com Docker
+## 6. Docker
 
-O `Dockerfile` na raiz do repositório permite executar a aplicação em um container Node.js.
-
-### Build da Imagem
+### Build
 
 ```bash
 docker build -t globalscore-frontend .
 ```
 
-### Executar o Container
+O `Dockerfile` executa o Vite no container e expõe a porta 5173.
 
-Ao rodar o container, informe o parâmetro `VITE_GLOBALSCORE_PROXY_TARGET` ou conecte os containers na mesma rede Docker:
+### Execução isolada
+
+Para usar o backend executado no host:
 
 ```bash
-docker run --rm -p 5173:5173 -e VITE_GLOBALSCORE_PROXY_TARGET=http://host.docker.internal:5000 globalscore-frontend
+docker run --rm \
+  -p 5173:5173 \
+  --env-file .env \
+  -e VITE_GLOBALSCORE_PROXY_TARGET=http://host.docker.internal:5000 \
+  globalscore-frontend
 ```
 
+### Frontend e backend na mesma rede Docker
+
+Crie a rede uma única vez:
+
+```bash
+docker network create globalscore-net
+```
+
+No repositório do backend:
+
+```bash
+docker run --rm \
+  --network globalscore-net \
+  --name globalscore-api \
+  -p 5000:5000 \
+  -v globalscore_dados:/app/dados \
+  --env-file backend/.env \
+  globalscore-api
+```
+
+No repositório do frontend:
+
+```bash
+docker run --rm \
+  --network globalscore-net \
+  --name globalscore-frontend \
+  -p 5173:5173 \
+  --env-file .env \
+  -e VITE_GLOBALSCORE_PROXY_TARGET=http://globalscore-api:5000 \
+  globalscore-frontend
+```
+
+Docker Compose não é obrigatório para o MVP.
+
 ---
 
-## 7. Comunicação com o Backend e Autenticação
+## 7. Comunicação com backend e autenticação
 
-### Fluxo de Autenticação Supabase Auth
-1. O usuário digita e-mail e senha na tela `/login`;
-2. O cliente Supabase (`src/services/supabase.js`) efetua a chamada à API externa do Supabase Auth;
-3. Após o sucesso, o Supabase retorna um `access_token` JWT de sessão;
-4. O `useAutenticacao` armazena o estado de sessão na aplicação;
-5. O cliente de API (`src/services/api.js`) anexa automaticamente o cabeçalho `Authorization: Bearer <access_token>` em todas as chamadas HTTP enviadas ao backend Flask;
-6. Caso o backend retorne HTTP 401 (token expirado ou inválido), o frontend encerra a sessão local e redireciona automaticamente para `/login`.
+Fluxo de autenticação:
 
----
+1. usuário informa e-mail e senha;
+2. o cliente Supabase autentica no serviço externo;
+3. o Supabase retorna um `access_token`;
+4. o cliente HTTP do GlobalScore envia `Authorization: Bearer <token>` à API Flask;
+5. o backend valida o token no Supabase Auth;
+6. com token válido, o backend processa a requisição;
+7. um HTTP 401 encerra a sessão local no frontend.
 
-## 8. Arquitetura e Decisões de Design
-
-- **Não-Recálculo de Regras**: O frontend é 100% receptivo e nunca recalcula estatísticas ou regras matemáticas no navegador, garantindo fidelidade com a API backend;
-- **Tratamento de Dados Ausentes**: Indicadores ou períodos sem cálculo de Global Score exibem o estado legível `Global Score —` ou `Sem Global Score calculado`, sem induzir o usuário a erros com notas 0,0 fictícias;
-- **Desativação Lógica**: Operações de exclusão de entidades ou indicadores solicitam confirmação visual e acionam desativação lógica no backend (`ativa: false`), preservando a rastreabilidade do histórico;
-- **Design System Flexível**: Construído com tokens CSS nativos e variáveis modulares, permitindo fácil adequação visual e dark mode sem frameworks genéricos pesados.
+O Supabase é usado para autenticação. Os dados de domínio permanecem na API GlobalScore e no SQLite do backend.
 
 ---
 
-## 9. Limitações Relevantes do MVP
+## 8. Fluxos principais da interface
 
-1. **Dependência de Conectividade Externa**: O login exige acesso à internet para alcançar os servidores do Supabase Auth;
-2. **Histórico Local de Proxy**: O proxy de desenvolvimento integrado ao Vite é voltado para ambiente de dev/teste local. Em implantação de produção final, recomenda-se servidor Nginx ou Caddy tratando o roteamento do bundle estático.
+### Projetos e domínio
+
+A aplicação permite selecionar projeto e trabalhar com entidades, indicadores e grupos comparáveis usados nas análises.
+
+### Importação
+
+O fluxo de importação conduz o usuário por:
+
+- upload de CSV/XLSX;
+- preview;
+- configuração de leitura;
+- mapeamento de colunas;
+- validação/dry-run;
+- revisão de alertas;
+- confirmação do lote.
+
+### Bases e avaliações
+
+Na área de Avaliações, o usuário pode:
+
+- criar uma Base de Referência;
+- escolher comparação entre entidades ou histórico da própria entidade;
+- processar a Base;
+- revisar população e indicadores;
+- ajustar pesos;
+- ativar a Base;
+- processar resultados em lote por intervalo mensal.
+
+### Dashboard
+
+O Dashboard mostra:
+
+- universo e quantidade de entidades avaliadas;
+- resultados incompletos;
+- grupo e Base de Referência usados;
+- ranking no modo `ENTRE_ENTIDADES`;
+- ausência explícita de ranking no modo `HISTORICO_ENTIDADE`;
+- Global Score da entidade na escala 0–100;
+- evolução histórica na mesma Base;
+- eventos associados aos períodos;
+- nota executiva determinística;
+- diagnóstico dos indicadores;
+- exportação do relatório em layout A4.
+
+Eventos são apresentados como fatos do período. A interface não afirma que um evento causou alteração no desempenho.
+
+---
+
+## 9. Decisões de arquitetura
+
+- o backend é a fonte de verdade para a matemática;
+- o frontend não duplica o cálculo de percentis ou Global Score;
+- dados ausentes são exibidos como ausência, não como score zero;
+- comunicação com a API ocorre por HTTP/JSON;
+- autenticação usa Bearer token emitido pelo Supabase Auth;
+- o proxy do Vite é usado no ambiente local e no container acadêmico do frontend.
+
+---
+
+## 10. Limitações do MVP
+
+- o login depende de conectividade com o Supabase Auth;
+- a execução via Vite é adequada ao desenvolvimento e à demonstração acadêmica, não representa uma configuração de produção em larga escala;
+- o frontend não implementa rating/faixas conceituais;
+- Docker Compose não é necessário para executar os componentes.
+
+---
+
+## 11. Atendimento aos requisitos acadêmicos
+
+| Requisito | Evidência no GlobalScore |
+|---|---|
+| Frontend independente | Este repositório público: [globalscore-frontend](https://github.com/jorgeluispapiro-gif/globalscore-frontend) |
+| API própria independente | Repositório público: [globalscore-api](https://github.com/jorgeluispapiro-gif/globalscore-api) |
+| API externa pública | Supabase Auth, com plano Free, usado para login e validação da sessão |
+| Comunicação entre componentes | HTTP/JSON com Bearer token; proxy `/api` no desenvolvimento |
+| Persistência permitida | SQLite gerenciado pelo backend com SQLAlchemy |
+| Métodos HTTP no frontend | GET, POST, PATCH e DELETE são usados em fluxos reais, incluindo Indicadores e Eventos |
+| API própria com documentação | Flask-RESTX com Swagger UI em `/docs` |
+| Containerização | Um `Dockerfile` em cada repositório |
+| Documentação de execução | README próprio no frontend e no backend |
+| Imagem da arquitetura | Diagrama exibido no início deste README |
+
+A API externa, suas rotas, o cadastro, o plano e as condições de uso estão
+documentados no [README do backend](https://github.com/jorgeluispapiro-gif/globalscore-api#9-autenticação-e-serviço-externo).
+
+O vídeo acadêmico de até seis minutos é um artefato externo aos repositórios e
+deve ser gravado e entregue conforme o roteiro da disciplina.
