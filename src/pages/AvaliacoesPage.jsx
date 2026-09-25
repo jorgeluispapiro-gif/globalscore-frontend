@@ -93,7 +93,12 @@ export function AvaliacoesPage() {
         entidade_referencia_id: formularioBase.modo === 'HISTORICO_ENTIDADE'
           ? Number(formularioBase.entidade_referencia_id) : null,
         nome: formularioBase.nome,
-        versao: Math.max(0, ...bases.map((item) => Number(item.versao))) + 1,
+        versao: Math.max(
+          0,
+          ...bases
+            .filter((item) => String(item.grupo_id) === String(formularioBase.grupo_id))
+            .map((item) => Number(item.versao)),
+        ) + 1,
         periodo_inicial: formularioBase.periodo_inicial, periodo_final: formularioBase.periodo_final,
         cobertura_minima_percentual: Number(formularioBase.cobertura_minima_percentual),
       });

@@ -17,15 +17,16 @@ vi.mock('../services/api', () => ({
 }));
 
 const grupo = { id: 10, nome: 'Unidades comerciais', ativo: true };
+const segundoGrupo = { id: 20, nome: 'Unidades administrativas', ativo: true };
 const entidades = [
   { id: 21, grupo_id: 10, nome: 'Unidade 1', ativa: true },
   { id: 22, grupo_id: 10, nome: 'Unidade 2', ativa: true },
 ];
 const indicador = { id: 31, nome: 'Vendas', ativo: true };
 
-function configurarConsultas(bases = []) {
+function configurarConsultas(bases = [], grupos = [grupo]) {
   obter.mockImplementation((caminho) => {
-    if (caminho.startsWith('/grupos')) return Promise.resolve([grupo]);
+    if (caminho.startsWith('/grupos')) return Promise.resolve(grupos);
     if (caminho.startsWith('/entidades')) return Promise.resolve(entidades);
     if (caminho.startsWith('/indicadores')) return Promise.resolve([indicador]);
     if (caminho.startsWith('/bases')) return Promise.resolve(typeof bases === 'function' ? bases() : bases);
@@ -44,7 +45,7 @@ describe('fluxo gerencial de avaliações', () => {
     let basesAtuais = [];
     configurarConsultas(() => basesAtuais);
     const rascunho = {
-      id: 40, nome: 'Histórico 2024–2025', versao: 1, modo: 'ENTRE_ENTIDADES',
+      id: 40, grupo_id: 10, nome: 'Histórico 2024–2025', versao: 1, modo: 'ENTRE_ENTIDADES',
       periodo_inicial: '2024-01', periodo_final: '2025-12', status: 'RASCUNHO',
       quantidade_entidades: 0, indicadores: [],
     };
@@ -101,7 +102,7 @@ describe('fluxo gerencial de avaliações', () => {
 
   it('processa um intervalo em lote e apresenta o resumo por entidade e período', async () => {
     const ativa = {
-      id: 50, nome: 'Referência vigente', versao: 1, modo: 'ENTRE_ENTIDADES',
+      id: 50, grupo_id: 10, nome: 'Referência vigente', versao: 1, modo: 'ENTRE_ENTIDADES',
       periodo_inicial: '2024-01', periodo_final: '2025-12', status: 'ATIVA',
       quantidade_entidades: 2,
       indicadores: [{ indicador_id: 31, status: 'VALIDO', tamanho_populacao: 2, peso_aplicado: 100 }],
@@ -140,5 +141,45 @@ describe('fluxo gerencial de avaliações', () => {
     expect(within(resumo).getAllByText('Unidade 1')).toHaveLength(2);
     expect(within(resumo).getByText('Unidade 2')).toBeInTheDocument();
     expect(within(resumo).getByText('78,4')).toBeInTheDocument();
+  });
+
+  it('calcula a próxima versão de forma independente para cada grupo', async () => {
+    const basesExistentes = [
+      { id: 61, grupo_id: 10, nome: 'Comercial v1', versao: 1, modo: 'ENTRE_ENTIDADES', periodo_inicial: '2024-01', periodo_final: '2024-03', status: 'RASCUNHO', indicadores: [] },
+      { id: 62, grupo_id: 10, nome: 'Comercial v2', versao: 2, modo: 'ENTRE_ENTIDADES', periodo_inicial: '2024-04', periodo_final: '2024-06', status: 'RASCUNHO', indicadores: [] },
+    ];
+    configurarConsultas(basesExistentes, [grupo, segundoGrupo]);
+    let proximoId = 70;
+    enviar.mockImplementation((caminho, dados) => Promise.resolve({
+      ...dados,
+      id: proximoId++,
+      status: 'RASCUNHO',
+      quantidade_entidades: 0,
+      indicadores: [],
+    }));
+
+    render(<AvaliacoesPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Nova base' }));
+    fireEvent.change(screen.getByLabelText('Nome'), { target: { value: 'Comercial v3' } });
+    fireEvent.change(screen.getByLabelText('Início do histórico'), { target: { value: '2025-01' } });
+    fireEvent.change(screen.getByLabelText('Fim do histórico'), { target: { value: '2025-03' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar base' }));
+
+    await waitFor(() => expect(enviar).toHaveBeenCalledWith('/bases', expect.objectContaining({
+      grupo_id: 10,
+      versao: 3,
+    })));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Nova base' }));
+    fireEvent.change(screen.getByLabelText('Nome'), { target: { value: 'Administrativa v1' } });
+    fireEvent.change(screen.getByLabelText('Grupo comparável'), { target: { value: '20' } });
+    fireEvent.change(screen.getByLabelText('Início do histórico'), { target: { value: '2025-01' } });
+    fireEvent.change(screen.getByLabelText('Fim do histórico'), { target: { value: '2025-03' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar base' }));
+
+    await waitFor(() => expect(enviar).toHaveBeenCalledWith('/bases', expect.objectContaining({
+      grupo_id: 20,
+      versao: 1,
+    })));
   });
 });
