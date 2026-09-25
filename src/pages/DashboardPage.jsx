@@ -1,65 +1,187 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowUpRight, CalendarDays, ListOrdered, ShieldCheck } from 'lucide-react';
 import { api } from '../services/api';
 import { useProjeto } from '../hooks/useProjeto';
-import { CabecalhoPagina, EstadoVazio, Mensagem } from '../components/ui/Estados';
-import { MetricCard } from '../components/dashboard/MetricCard';
-import { StoryControls } from '../components/dashboard/StoryControls';
+import { EstadoVazio, Mensagem } from '../components/ui/Estados';
 import { RankingPanel } from '../components/dashboard/RankingPanel';
-import { TimelineEvent } from '../components/dashboard/TimelineEvent';
+import { IndicatorDiagnosticList } from '../components/dashboard/IndicatorDiagnosticList';
 import { ScoreEvolutionChart } from '../components/charts/ScoreEvolutionChart';
-import { IndicatorRadarChart } from '../components/charts/IndicatorRadarChart';
-import { IndicatorBarChart } from '../components/charts/IndicatorBarChart';
+
+function periodoAtual() {
+  const agora = new Date();
+  return `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatarNumero(valor, casas = 1) {
+  if (valor === null || valor === undefined) return '—';
+  return Number(valor).toLocaleString('pt-BR', {
+    minimumFractionDigits: casas,
+    maximumFractionDigits: casas,
+  });
+}
+
+function formatarPeriodo(periodo) {
+  if (!periodo) return '—';
+  const [ano, mes] = periodo.split('-').map(Number);
+  return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' })
+    .format(new Date(ano, mes - 1, 1));
+}
 
 export function DashboardPage() {
   const { projeto, projetoId } = useProjeto();
-  const [avaliacao, setAvaliacao] = useState(null);
-  const [indicadores, setIndicadores] = useState([]);
-  const [base, setBase] = useState(null);
+  const [grupos, setGrupos] = useState([]);
+  const [grupoId, setGrupoId] = useState('');
+  const [periodo, setPeriodo] = useState(periodoAtual);
+  const [overview, setOverview] = useState(null);
+  const [entidadeSelecionadaId, setEntidadeSelecionadaId] = useState('');
+  const [detalhe, setDetalhe] = useState(null);
+  const [carregandoOverview, setCarregandoOverview] = useState(false);
+  const [carregandoDetalhe, setCarregandoDetalhe] = useState(false);
   const [erro, setErro] = useState('');
-  const [tocando, setTocando] = useState(false);
-  const [indice, setIndice] = useState(0);
 
   useEffect(() => {
-    const id = localStorage.getItem('globalscore:ultima-avaliacao-id');
-    if (!id || !projetoId) { setAvaliacao(null); return; }
-    Promise.all([api.get(`/avaliacoes/${id}`), api.get(`/indicadores?projeto_id=${projetoId}`), api.get('/bases')])
-      .then(([dadosAvaliacao, dadosIndicadores, bases]) => {
-        setAvaliacao(dadosAvaliacao);
-        setIndicadores(dadosIndicadores);
-        setBase(bases.find((item) => item.id === dadosAvaliacao.base_referencia_id) || null);
-        setErro('');
+    let ativo = true;
+    setGrupos([]);
+    setGrupoId('');
+    setOverview(null);
+    setDetalhe(null);
+    setEntidadeSelecionadaId('');
+    setErro('');
+    if (!projetoId) return () => { ativo = false; };
+
+    api.get(`/grupos?projeto_id=${projetoId}`)
+      .then((dados) => {
+        if (!ativo) return;
+        setGrupos(dados);
+        setGrupoId(dados[0] ? String(dados[0].id) : '');
       })
-      .catch((falha) => setErro(falha.message));
+      .catch((falha) => { if (ativo) setErro(falha.message); });
+    return () => { ativo = false; };
   }, [projetoId]);
 
-  const itens = useMemo(() => (avaliacao?.itens || []).filter((item) => item.pontuacao_percentil !== null).map((item) => ({ ...item, nome: indicadores.find((ind) => ind.id === item.indicador_id)?.nome || `Indicador ${item.indicador_id}` })), [avaliacao, indicadores]);
-  const serie = avaliacao ? [{ periodo: avaliacao.periodo, global_score: avaliacao.global_score }] : [];
-  const periodo = avaliacao?.periodo ? avaliacao.periodo.split('-').reverse().join('/') : '—';
+  useEffect(() => {
+    let ativo = true;
+    setOverview(null);
+    setDetalhe(null);
+    setErro('');
+    if (!projetoId || !grupoId || !periodo) return () => { ativo = false; };
+
+    setCarregandoOverview(true);
+    api.get(`/analytics/overview?projeto_id=${projetoId}&grupo_id=${grupoId}&periodo=${periodo}`)
+      .then((dados) => {
+        if (!ativo) return;
+        setOverview(dados);
+        setEntidadeSelecionadaId((atual) => {
+          const permaneceNoRanking = dados.ranking.some(
+            (item) => String(item.entidade_id) === String(atual),
+          );
+          return permaneceNoRanking ? atual : String(dados.ranking[0]?.entidade_id || '');
+        });
+      })
+      .catch((falha) => { if (ativo) setErro(falha.message); })
+      .finally(() => { if (ativo) setCarregandoOverview(false); });
+    return () => { ativo = false; };
+  }, [projetoId, grupoId, periodo]);
 
   useEffect(() => {
-    if (!tocando || serie.length < 2) return undefined;
-    const temporizador = window.setInterval(() => {
-      setIndice((atual) => {
-        if (atual >= serie.length - 1) {
-          setTocando(false);
-          return atual;
-        }
-        return atual + 1;
-      });
-    }, 1800);
-    return () => window.clearInterval(temporizador);
-  }, [tocando, serie.length]);
+    let ativo = true;
+    setDetalhe(null);
+    if (!overview?.base_referencia_id || !entidadeSelecionadaId) {
+      setCarregandoDetalhe(false);
+      return () => { ativo = false; };
+    }
 
-  return <div className="pagina-dashboard">
-    <CabecalhoPagina sobretitulo="Visão geral" titulo={projeto?.nome || 'Desempenho'} descricao="Visão consolidada do desempenho e sua evolução." acoes={<span className="selo-confianca"><ShieldCheck />Resultados consolidados</span>} />
+    setCarregandoDetalhe(true);
+    api.get(`/analytics/entidades/${entidadeSelecionadaId}?base_referencia_id=${overview.base_referencia_id}&periodo=${periodo}`)
+      .then((dados) => { if (ativo) setDetalhe(dados); })
+      .catch((falha) => { if (ativo) setErro(falha.message); })
+      .finally(() => { if (ativo) setCarregandoDetalhe(false); });
+    return () => { ativo = false; };
+  }, [entidadeSelecionadaId, overview?.base_referencia_id, periodo]);
+
+  const grupoSelecionado = useMemo(
+    () => grupos.find((grupo) => String(grupo.id) === String(grupoId)) || null,
+    [grupos, grupoId],
+  );
+  const base = overview?.base_referencia;
+  const avaliacao = detalhe?.avaliacao;
+
+  if (!projeto) {
+    return <EstadoVazio titulo="Nenhum projeto selecionado" descricao="Crie ou selecione um projeto para começar a análise." />;
+  }
+
+  return <div className="dashboard-analitico">
+    <header className="dashboard-cabecalho">
+      <div className="dashboard-cabecalho__titulo">
+        <span className="sobretitulo">Visão geral</span>
+        <h1>{projeto.nome}</h1>
+        <p>Desempenho comparativo das entidades e evolução dos resultados.</p>
+      </div>
+      <div className="dashboard-filtros" aria-label="Filtros da análise">
+        <label>Grupo<select value={grupoId} onChange={(evento) => setGrupoId(evento.target.value)}><option value="">Selecione um grupo</option>{grupos.map((grupo) => <option key={grupo.id} value={grupo.id}>{grupo.nome}</option>)}</select></label>
+        <label>Período<input type="month" value={periodo} onChange={(evento) => setPeriodo(evento.target.value)} /></label>
+      </div>
+      <div className="dashboard-referencia" aria-label="Base de Referência usada">
+        <span>Referência utilizada</span>
+        <strong>{base ? `${base.nome} · v${base.versao}` : 'Nenhuma Base ativa'}</strong>
+        {base && <small>{base.periodo_inicial} — {base.periodo_final}</small>}
+      </div>
+    </header>
+
     {erro && <Mensagem>{erro}</Mensagem>}
-    {!projeto && <EstadoVazio titulo="Nenhum projeto selecionado" descricao="Crie ou selecione um projeto para começar a análise." />}
-    {projeto && <>
-      <section className="metric-grid"><MetricCard rotulo="GLOBAL SCORE" valor={avaliacao?.global_score != null ? avaliacao.global_score.toFixed(1).replace('.', ',') : '—'} detalhe={avaliacao ? 'Escala percentílica 0–100' : 'Nenhuma avaliação selecionada'} destaque /><MetricCard rotulo="RATING" valor="—" detalhe="Classificação ainda não disponível" /><MetricCard rotulo="POSIÇÃO" valor="—" detalhe="Posição ainda não disponível" /><MetricCard rotulo="PERÍODO" valor={periodo} detalhe={avaliacao?.status || 'Sem avaliação'} /></section>
-      <section className="painel painel--principal"><div className="painel__cabecalho"><div><span className="indice-editorial">01</span><div><h2>Evolução do Global Score</h2><p>Acompanhe a variação do desempenho ao longo do tempo.</p></div></div><CalendarDays /></div><StoryControls tocando={tocando} aoTocar={() => setTocando(!tocando)} aoReiniciar={() => setIndice(0)} aoAvancar={() => setIndice(Math.min(indice + 1, serie.length - 1))} aoVoltar={() => setIndice(Math.max(indice - 1, 0))} desabilitado={serie.length < 2} /><ScoreEvolutionChart dados={serie} eventos={[]} indiceVisivel={indice} /><TimelineEvent evento={null} /></section>
-      <div className="dashboard-grid dashboard-grid--duplo"><section className="painel"><div className="painel__cabecalho"><div><span className="indice-editorial">02</span><div><h2>Perfil de desempenho</h2><p>Comparação dos indicadores na escala de 0 a 100.</p></div></div><ArrowUpRight /></div><IndicatorRadarChart dados={itens} /></section><section className="painel"><div className="painel__cabecalho"><div><span className="indice-editorial">03</span><div><h2>Indicadores</h2><p>Pontuação e peso de cada indicador.</p></div></div><ListOrdered /></div><IndicatorBarChart dados={itens} /></section></div>
-      <div className="dashboard-grid dashboard-grid--narrativa"><section className="painel painel--narrativa"><span className="sobretitulo">Leitura do período</span><h2>{avaliacao ? `Avaliação de ${periodo} com ${itens.length} indicador${itens.length === 1 ? '' : 'es'}.` : 'Calcule uma avaliação para iniciar a leitura dos resultados.'}</h2><p>{avaliacao ? 'O resultado resume o desempenho da entidade no período selecionado.' : 'Selecione uma avaliação para visualizar o resumo do período.'}</p></section><section className="painel"><div className="painel__cabecalho painel__cabecalho--simples"><div><span className="sobretitulo">Comparação</span><h2>Ranking do grupo</h2></div></div><RankingPanel dados={[]} entidadeId={avaliacao?.entidade_id} modoBase={base?.modo} /></section></div>
+    {!grupoId && <EstadoVazio titulo="Nenhum grupo disponível" descricao="Cadastre um grupo comparável para iniciar a leitura do projeto." />}
+    {grupoId && carregandoOverview && <div className="dashboard-carregando" role="status">Preparando visão do período…</div>}
+
+    {grupoId && overview && <>
+      <section className="dashboard-macro" aria-labelledby="titulo-macro">
+        <div className="dashboard-macro__principal">
+          <span id="titulo-macro">Unidades avaliadas</span>
+          <strong>{overview.quantidade_avaliadas}</strong>
+          <p>de {overview.quantidade_entidades} entidades em {formatarPeriodo(periodo)}</p>
+        </div>
+        <dl className="dashboard-macro__contexto">
+          <div><dt>Resultados incompletos</dt><dd>{overview.quantidade_incompletas}</dd></div>
+          <div><dt>Universo do grupo</dt><dd>{overview.quantidade_entidades}</dd></div>
+          <div><dt>Grupo analisado</dt><dd>{grupoSelecionado?.nome || '—'}</dd></div>
+          <div><dt>Modo da referência</dt><dd>{base?.modo === 'HISTORICO_ENTIDADE' ? 'Histórico da entidade' : base ? 'Entre entidades' : '—'}</dd></div>
+        </dl>
+      </section>
+
+      {!base && <EstadoVazio titulo="Nenhuma Base de Referência ativa" descricao="Ative uma Base para consultar os resultados consolidados deste grupo." />}
+      {base && <section className="dashboard-corpo">
+        <aside className="dashboard-ranking" aria-labelledby="titulo-ranking">
+          <div className="secao-editorial__cabecalho">
+            <div><span>Comparação</span><h2 id="titulo-ranking">Ranking do período</h2></div>
+            <small>{overview.ranking.length} resultados</small>
+          </div>
+          <RankingPanel
+            dados={overview.ranking}
+            entidadeId={Number(entidadeSelecionadaId)}
+            modoBase={base.modo}
+            aoSelecionar={(entidadeId) => setEntidadeSelecionadaId(String(entidadeId))}
+          />
+        </aside>
+
+        <div className="dashboard-detalhe">
+          {!entidadeSelecionadaId && <EstadoVazio titulo="Selecione uma entidade" descricao="Escolha uma unidade no ranking para aprofundar a análise." />}
+          {entidadeSelecionadaId && carregandoDetalhe && <div className="dashboard-carregando" role="status">Carregando detalhe da entidade…</div>}
+          {entidadeSelecionadaId && !carregandoDetalhe && detalhe && <>
+            <section className="entidade-resumo" aria-labelledby="titulo-entidade">
+              <div><span>Entidade selecionada</span><h2 id="titulo-entidade">{detalhe.entidade_nome}</h2><p>{formatarPeriodo(periodo)} · <b>{avaliacao?.status || 'SEM AVALIAÇÃO'}</b></p></div>
+              <div className="entidade-score"><span>Global Score</span><strong>{formatarNumero(avaliacao?.global_score)}</strong><small>escala 0–100</small></div>
+            </section>
+
+            <section className="secao-analitica secao-analitica--evolucao" aria-labelledby="titulo-evolucao">
+              <div className="secao-editorial__cabecalho"><div><span>Tendência</span><h2 id="titulo-evolucao">Evolução do Global Score</h2></div><small>Mesma Base de Referência</small></div>
+              <ScoreEvolutionChart dados={detalhe.evolucao} eventos={[]} />
+            </section>
+
+            <section className="secao-analitica" aria-labelledby="titulo-indicadores">
+              <div className="secao-editorial__cabecalho"><div><span>Diagnóstico</span><h2 id="titulo-indicadores">Indicadores da entidade</h2></div><small>{detalhe.indicadores.length} indicadores</small></div>
+              <IndicatorDiagnosticList dados={detalhe.indicadores} />
+            </section>
+          </>}
+        </div>
+      </section>}
     </>}
   </div>;
 }
