@@ -1,35 +1,100 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="460" viewBox="0 0 1280 460" role="img" aria-labelledby="titulo descricao">
-  <title id="titulo">Arquitetura do GlobalScore</title>
-  <desc id="descricao">Fluxo entre navegador React, Supabase Auth e API Flask com banco SQLite.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="520" viewBox="0 0 1280 520" role="img" aria-labelledby="titulo descricao">
+  <title id="titulo">Arquitetura do MVP GlobalScore</title>
+  <desc id="descricao">Fluxo entre Frontend React, Backend Flask RESTX, Supabase Auth e banco SQLite local.</desc>
   <defs>
-    <linearGradient id="fundo" x1="0" x2="1"><stop stop-color="#06152f"/><stop offset="1" stop-color="#102b55"/></linearGradient>
-    <marker id="seta" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L0 6 L9 3 z" fill="#0ea5e9"/></marker>
-    <filter id="sombra" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="10" flood-opacity=".12"/></filter>
+    <linearGradient id="fundo-hdr" x1="0" x2="1"><stop stop-color="#06152f"/><stop offset="1" stop-color="#102b55"/></linearGradient>
+    <marker id="seta-blue" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L0 6 L9 3 z" fill="#0ea5e9"/></marker>
+    <marker id="seta-green" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L0 6 L9 3 z" fill="#10b981"/></marker>
+    <marker id="seta-purple" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L0 6 L9 3 z" fill="#6366f1"/></marker>
+    <filter id="sombra" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="6" stdDeviation="8" flood-opacity=".1"/></filter>
   </defs>
-  <rect width="1280" height="460" rx="24" fill="#f3f6f9"/>
-  <rect width="1280" height="88" rx="24" fill="url(#fundo)"/><rect y="64" width="1280" height="24" fill="url(#fundo)"/>
-  <text x="48" y="45" fill="#fff" font-family="Arial, sans-serif" font-weight="700" font-size="26">GLOBALSCORE</text>
-  <text x="48" y="68" fill="#9fc0e5" font-family="Arial, sans-serif" font-size="13" letter-spacing="2">MEASURE · COMPARE · ADVANCE</text>
+
+  <!-- Fundo principal -->
+  <rect width="1280" height="520" rx="20" fill="#f8fafc"/>
+  
+  <!-- Cabecalho -->
+  <rect width="1280" height="80" rx="20" fill="url(#fundo-hdr)"/>
+  <rect y="60" width="1280" height="20" fill="url(#fundo-hdr)"/>
+  <text x="40" y="42" fill="#fff" font-family="Arial, sans-serif" font-weight="700" font-size="24">ARQUITETURA DO MVP GLOBALSCORE</text>
+  <text x="40" y="64" fill="#9fc0e5" font-family="Arial, sans-serif" font-size="12" letter-spacing="2">MEASURE · COMPARE · ADVANCE</text>
+
+  <!-- COMPONENTE 1: FRONTEND REACT -->
   <g filter="url(#sombra)">
-    <rect x="48" y="144" width="292" height="196" rx="16" fill="#fff" stroke="#dce3eb"/>
-    <rect x="494" y="144" width="292" height="196" rx="16" fill="#fff" stroke="#dce3eb"/>
-    <rect x="940" y="144" width="292" height="196" rx="16" fill="#fff" stroke="#dce3eb"/>
+    <rect x="40" y="120" width="350" height="300" rx="16" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+    <!-- Badge Componente 1 -->
+    <rect x="56" y="136" width="130" height="26" rx="13" fill="#eff6ff"/>
+    <text x="121" y="153" text-anchor="middle" fill="#1d4ed8" font-family="Arial" font-weight="700" font-size="11">COMPONENTE 1</text>
+    <text x="56" y="192" fill="#0f172a" font-family="Arial" font-weight="700" font-size="20">Frontend React</text>
+    <text x="56" y="212" fill="#64748b" font-family="Arial" font-size="13">React 19 + Vite + Recharts</text>
+    
+    <line x1="56" y1="228" x2="374" y2="228" stroke="#f1f5f9" stroke-width="1.5"/>
+    
+    <text x="56" y="254" fill="#334155" font-family="Arial" font-size="13">• Interface web responsiva (Shell &amp; Views)</text>
+    <text x="56" y="278" fill="#334155" font-family="Arial" font-size="13">• Login e gestão de sessão de usuário</text>
+    <text x="56" y="302" fill="#334155" font-family="Arial" font-size="13">• Dashboard (Evolução, Radar, Ranking)</text>
+    <text x="56" y="326" fill="#334155" font-family="Arial" font-size="13">• Importação assistida (Preview &amp; Dry-run)</text>
+    <text x="56" y="350" fill="#334155" font-family="Arial" font-size="13">• Exportação de relatórios em A4</text>
+    
+    <rect x="56" y="374" width="318" height="30" rx="8" fill="#f1f5f9"/>
+    <text x="215" y="393" text-anchor="middle" fill="#475569" font-family="Arial" font-size="12">Cliente HTTP com Bearer Token</text>
   </g>
-  <circle cx="92" cy="188" r="20" fill="#e9f4ff"/><text x="92" y="194" text-anchor="middle" fill="#0b63ce" font-family="Arial" font-weight="700">1</text>
-  <text x="124" y="183" fill="#06152f" font-family="Arial" font-weight="700" font-size="21">FRONTEND</text><text x="124" y="204" fill="#64748b" font-family="Arial" font-size="13">React + Vite + Recharts</text>
-  <text x="76" y="246" fill="#42516a" font-family="Arial" font-size="14">Interação, navegação, visualização</text><text x="76" y="271" fill="#42516a" font-family="Arial" font-size="14">e storytelling dos resultados.</text>
-  <rect x="76" y="298" width="166" height="24" rx="12" fill="#eef6ff"/><text x="159" y="315" text-anchor="middle" fill="#0751ad" font-family="Arial" font-size="11">Bearer access_token</text>
-  <circle cx="538" cy="188" r="20" fill="#e9f9f0"/><text x="538" y="194" text-anchor="middle" fill="#08713d" font-family="Arial" font-weight="700">2</text>
-  <text x="570" y="183" fill="#06152f" font-family="Arial" font-weight="700" font-size="21">API EXTERNA</text><text x="570" y="204" fill="#64748b" font-family="Arial" font-size="13">Supabase Auth</text>
-  <text x="522" y="246" fill="#42516a" font-family="Arial" font-size="14">Login por e-mail e senha, sessão</text><text x="522" y="271" fill="#42516a" font-family="Arial" font-size="14">persistida e emissão de token.</text>
-  <rect x="522" y="298" width="173" height="24" rx="12" fill="#e9f9f0"/><text x="608" y="315" text-anchor="middle" fill="#08713d" font-family="Arial" font-size="11">serviço público externo</text>
-  <circle cx="984" cy="188" r="20" fill="#e8f5f7"/><text x="984" y="194" text-anchor="middle" fill="#007d75" font-family="Arial" font-weight="700">3</text>
-  <text x="1016" y="183" fill="#06152f" font-family="Arial" font-weight="700" font-size="21">BACKEND</text><text x="1016" y="204" fill="#64748b" font-family="Arial" font-size="13">Flask RESTX + SQLite</text>
-  <text x="968" y="246" fill="#42516a" font-family="Arial" font-size="14">Regras, percentis, pesos, score,</text><text x="968" y="271" fill="#42516a" font-family="Arial" font-size="14">validação e persistência.</text>
-  <rect x="968" y="298" width="183" height="24" rx="12" fill="#e8f5f7"/><text x="1059" y="315" text-anchor="middle" fill="#007d75" font-family="Arial" font-size="11">fonte do resultado calculado</text>
-  <line x1="350" y1="216" x2="478" y2="216" stroke="#0ea5e9" stroke-width="3" marker-end="url(#seta)"/><text x="414" y="202" text-anchor="middle" fill="#64748b" font-family="Arial" font-size="12">login</text>
-  <line x1="786" y1="216" x2="924" y2="216" stroke="#0ea5e9" stroke-width="3" marker-end="url(#seta)"/><text x="855" y="202" text-anchor="middle" fill="#64748b" font-family="Arial" font-size="12">validação</text>
-  <path d="M940 300 C820 400 450 400 340 300" fill="none" stroke="#0b63ce" stroke-width="3" marker-end="url(#seta)"/>
-  <text x="640" y="394" text-anchor="middle" fill="#42516a" font-family="Arial" font-size="13">JSON com dados persistidos e resultados calculados</text>
-  <text x="640" y="432" text-anchor="middle" fill="#64748b" font-family="Arial" font-size="12">Três componentes independentes · comunicação HTTP · responsabilidades separadas</text>
+
+  <!-- SERVIÇO EXTERNO: SUPABASE AUTH -->
+  <g filter="url(#sombra)">
+    <rect x="465" y="120" width="350" height="150" rx="16" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+    <!-- Badge Serviço Externo -->
+    <rect x="481" y="136" width="140" height="26" rx="13" fill="#ecfdf5"/>
+    <text x="551" y="153" text-anchor="middle" fill="#047857" font-family="Arial" font-weight="700" font-size="11">SERVIÇO EXTERNO</text>
+    <text x="481" y="192" fill="#0f172a" font-family="Arial" font-weight="700" font-size="20">Supabase Auth</text>
+    <text x="481" y="212" fill="#64748b" font-family="Arial" font-size="13">API HTTP Pública de Autenticação</text>
+    <text x="481" y="240" fill="#334155" font-family="Arial" font-size="13">• Emissão e validação de JWTs (Access Token)</text>
+    <text x="481" y="258" fill="#334155" font-family="Arial" font-size="13">• Autenticação por e-mail e senha</text>
+  </g>
+
+  <!-- COMPONENTE 2: BACKEND FLASK RESTX -->
+  <g filter="url(#sombra)">
+    <rect x="890" y="120" width="350" height="370" rx="16" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+    <!-- Badge Componente 2 -->
+    <rect x="906" y="136" width="130" height="26" rx="13" fill="#f5f3ff"/>
+    <text x="971" y="153" text-anchor="middle" fill="#6d28d9" font-family="Arial" font-weight="700" font-size="11">COMPONENTE 2</text>
+    <text x="906" y="192" fill="#0f172a" font-family="Arial" font-weight="700" font-size="20">Backend Flask RESTX</text>
+    <text x="906" y="212" fill="#64748b" font-family="Arial" font-size="13">Python 3.11 + Flask-SQLAlchemy + Swagger</text>
+    
+    <line x1="906" y1="228" x2="1224" y2="228" stroke="#f1f5f9" stroke-width="1.5"/>
+    
+    <text x="906" y="254" fill="#334155" font-family="Arial" font-size="13">• Endpoints REST &amp; Swagger UI (/docs)</text>
+    <text x="906" y="278" fill="#334155" font-family="Arial" font-size="13">• Motor de cálculo (Score, Percentis, Pesos)</text>
+    <text x="906" y="302" fill="#334155" font-family="Arial" font-size="13">• Bases de Referência congeladas</text>
+    <text x="906" y="326" fill="#334155" font-family="Arial" font-size="13">• Validação de token no Supabase Auth</text>
+
+    <!-- Sub-bloco Banco de Dados Local SQLite -->
+    <rect x="906" y="350" width="318" height="122" rx="12" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <rect x="918" y="362" width="100" height="22" rx="11" fill="#e0f2fe"/>
+    <text x="968" y="377" text-anchor="middle" fill="#0369a1" font-family="Arial" font-weight="700" font-size="10">BANCO LOCAL</text>
+    <text x="918" y="404" fill="#0f172a" font-family="Arial" font-weight="700" font-size="15">SQLite (globalscore.db)</text>
+    <text x="918" y="424" fill="#475569" font-family="Arial" font-size="12">Persistência local de Projetos, Entidades, Indicadores,</text>
+    <text x="918" y="442" fill="#475569" font-family="Arial" font-size="12">Observações brutas, Bases e Avaliações calculadas.</text>
+    <text x="918" y="460" fill="#64748b" font-family="Arial" font-size="11" font-style="italic">(Não classificado como serviço externo)</text>
+  </g>
+
+  <!-- FLUXOS E SETAS -->
+  
+  <!-- 1. Frontend ↔ Supabase Auth (Login) -->
+  <path d="M 390 160 L 465 160" fill="none" stroke="#10b981" stroke-width="2.5" marker-end="url(#seta-green)"/>
+  <text x="427" y="152" text-anchor="middle" fill="#047857" font-family="Arial" font-weight="700" font-size="11">Login / Sessão</text>
+
+  <!-- 2. Frontend → Backend (HTTP JSON + Bearer) -->
+  <path d="M 390 320 Q 640 370 890 320" fill="none" stroke="#0ea5e9" stroke-width="2.5" marker-end="url(#seta-blue)"/>
+  <text x="640" y="340" text-anchor="middle" fill="#0284c7" font-family="Arial" font-weight="700" font-size="12">HTTP JSON + Bearer &lt;access_token&gt;</text>
+
+  <!-- 3. Backend → Supabase Auth (Valida token) -->
+  <path d="M 890 160 L 815 160" fill="none" stroke="#6366f1" stroke-width="2.5" marker-end="url(#seta-purple)"/>
+  <text x="852" y="152" text-anchor="middle" fill="#4338ca" font-family="Arial" font-weight="700" font-size="11">Valida Token</text>
+
+  <!-- 4. Backend → Frontend (JSON Resposta) -->
+  <path d="M 890 280 Q 640 230 390 280" fill="none" stroke="#0ea5e9" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#seta-blue)"/>
+  <text x="640" y="270" text-anchor="middle" fill="#475569" font-family="Arial" font-size="12">Respostas JSON (Dados Persistidos &amp; Scores Calculados)</text>
+
+  <!-- Rodape -->
+  <text x="640" y="505" text-anchor="middle" fill="#64748b" font-family="Arial" font-size="12">Dois Componentes Principais · Um Serviço Externo (Supabase Auth) · Persistência em Banco Local (SQLite)</text>
 </svg>
