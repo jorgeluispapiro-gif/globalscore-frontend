@@ -83,6 +83,8 @@ describe('fluxo gerencial de avaliações', () => {
       periodo_final: '2025-12',
       cobertura_minima_percentual: 50,
     })));
+    const chamadaCriacao = enviar.mock.calls.find(([caminho]) => caminho === '/bases');
+    expect(chamadaCriacao[1]).not.toHaveProperty('entidade_referencia_id');
     fireEvent.click(await screen.findByRole('button', { name: 'Processar base' }));
     const campoPeso = await screen.findByLabelText('Peso de Vendas');
     expect(within(screen.getByText('Entidades elegíveis').parentElement).getByText('2')).toBeInTheDocument();

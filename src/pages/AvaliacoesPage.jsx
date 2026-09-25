@@ -87,11 +87,9 @@ export function AvaliacoesPage() {
   async function criarBase(evento) {
     evento.preventDefault(); setAcao('criar'); setMensagem(null);
     try {
-      const criada = await api.post('/bases', {
+      const dadosBase = {
         projeto_id: Number(projetoId), grupo_id: Number(formularioBase.grupo_id),
         modo: formularioBase.modo,
-        entidade_referencia_id: formularioBase.modo === 'HISTORICO_ENTIDADE'
-          ? Number(formularioBase.entidade_referencia_id) : null,
         nome: formularioBase.nome,
         versao: Math.max(
           0,
@@ -101,7 +99,11 @@ export function AvaliacoesPage() {
         ) + 1,
         periodo_inicial: formularioBase.periodo_inicial, periodo_final: formularioBase.periodo_final,
         cobertura_minima_percentual: Number(formularioBase.cobertura_minima_percentual),
-      });
+      };
+      if (formularioBase.modo === 'HISTORICO_ENTIDADE') {
+        dadosBase.entidade_referencia_id = Number(formularioBase.entidade_referencia_id);
+      }
+      const criada = await api.post('/bases', dadosBase);
       setBases((atuais) => atualizarLista(atuais, criada)); setBaseId(String(criada.id)); setCriando(false);
       setMensagem({ tipo: 'sucesso', texto: 'Base de Referência criada. Processe a base para revisar sua população.' });
     } catch (erro) { setMensagem({ tipo: 'erro', texto: erro.message }); } finally { setAcao(''); }
