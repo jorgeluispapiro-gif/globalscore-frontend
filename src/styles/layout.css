@@ -1771,9 +1771,193 @@
   letter-spacing: -0.055em;
 }
 
+.entidade-resumo__resultado {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.nota-executiva {
+  padding: var(--space-5) 0 var(--space-5) var(--space-6);
+  border-left: 3px solid var(--color-primary-600);
+}
+
+.nota-executiva > span {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--color-primary-700);
+  font: 700 0.67rem var(--font-display);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.nota-executiva h3 {
+  margin-bottom: var(--space-3);
+  font-size: 1.2rem;
+}
+
+.nota-executiva p {
+  max-width: 58rem;
+  margin: 0;
+  color: var(--color-navy-900);
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+.nota-executiva p + p {
+  margin-top: var(--space-1);
+}
+
 .secao-analitica--evolucao .grafico-area {
   height: 24rem;
   padding: var(--space-4) var(--space-4) var(--space-2);
+}
+
+.evolucao-eventos {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  border-top: var(--border);
+  list-style: none;
+}
+
+.evolucao-eventos > li {
+  display: grid;
+  align-items: start;
+  padding: var(--space-4) var(--space-6);
+  grid-template-columns: minmax(11rem, 0.45fr) minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+.evolucao-eventos > li + li {
+  border-top: var(--border);
+}
+
+.evolucao-eventos time {
+  display: block;
+  color: var(--color-amber-600);
+  font: 700 0.72rem var(--font-display);
+  letter-spacing: 0.08em;
+}
+
+.evolucao-eventos strong {
+  color: var(--color-navy-900);
+  font-size: 0.82rem;
+}
+
+.evolucao-eventos ul {
+  margin: 0;
+  padding-left: 1rem;
+  color: var(--color-text-soft);
+  font-size: 0.8rem;
+}
+
+.eventos-entidade__registrar {
+  min-height: auto;
+  padding: var(--space-2) 0;
+  color: var(--color-primary-700);
+}
+
+.evento-formulario {
+  display: grid;
+  align-items: end;
+  padding: var(--space-5) var(--space-6);
+  border-bottom: var(--border);
+  background: var(--color-surface-soft);
+  grid-template-columns: minmax(9rem, 0.5fr) minmax(14rem, 1fr);
+  gap: var(--space-4);
+}
+
+.evento-formulario label {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text-soft);
+  font-size: 0.76rem;
+  font-weight: var(--weight-semibold);
+}
+
+.evento-formulario input,
+.evento-formulario textarea {
+  width: 100%;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.evento-formulario input {
+  min-height: 2.7rem;
+  padding: 0 var(--space-3);
+}
+
+.evento-formulario textarea {
+  min-height: 4.6rem;
+  padding: var(--space-3);
+  resize: vertical;
+}
+
+.evento-formulario__descricao,
+.evento-formulario__erro,
+.evento-formulario__acoes {
+  grid-column: 1 / -1;
+}
+
+.evento-formulario__erro {
+  margin: 0;
+  color: var(--color-red-600);
+  font-size: 0.78rem;
+}
+
+.evento-formulario__acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.eventos-entidade__vazio {
+  margin: 0;
+  padding: var(--space-6);
+  color: var(--color-muted);
+  font-size: 0.84rem;
+}
+
+.eventos-entidade__lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.eventos-entidade__lista > li {
+  display: grid;
+  min-height: 4.8rem;
+  align-items: center;
+  padding: var(--space-4) var(--space-6);
+  grid-template-columns: 5rem minmax(0, 1fr) auto;
+  gap: var(--space-4);
+}
+
+.eventos-entidade__lista > li + li {
+  border-top: var(--border);
+}
+
+.eventos-entidade__lista time {
+  color: var(--color-amber-600);
+  font: 700 0.72rem var(--font-display);
+  letter-spacing: 0.06em;
+}
+
+.eventos-entidade__lista strong {
+  color: var(--color-navy-900);
+  font: 600 0.9rem var(--font-display);
+}
+
+.eventos-entidade__lista p {
+  margin: var(--space-1) 0 0;
+  font-size: 0.78rem;
+}
+
+.eventos-entidade__acoes {
+  display: flex;
+  gap: var(--space-2);
 }
 
 .indicadores-diagnostico {
@@ -1887,8 +2071,136 @@
   .dashboard-macro__principal > strong { font-size: 5rem; }
   .dashboard-macro__contexto > div { min-height: 7rem; }
   .entidade-resumo { align-items: flex-start; flex-direction: column; }
+  .entidade-resumo__resultado { width: 100%; align-items: flex-start; flex-direction: column-reverse; gap: var(--space-4); }
   .entidade-score { justify-items: start; }
+  .evento-formulario,
+  .evolucao-eventos > li { grid-template-columns: 1fr; }
+  .eventos-entidade__lista > li { align-items: start; grid-template-columns: 4rem minmax(0, 1fr); }
+  .eventos-entidade__acoes { grid-column: 2; }
   .indicador-diagnostico dl { grid-column: auto; }
   .secao-editorial__cabecalho { align-items: flex-start; flex-direction: column; }
   .secao-editorial__cabecalho small { text-align: left; }
+}
+
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+
+  html,
+  body {
+    min-width: 0;
+    background: #fff;
+    color: #111827;
+    print-color-adjust: exact;
+  }
+
+  .sidebar,
+  .topbar,
+  .dashboard-filtros,
+  .dashboard-ranking,
+  .nao-imprimir {
+    display: none !important;
+  }
+
+  .app-shell,
+  .app-main,
+  .workspace {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .dashboard-analitico,
+  .dashboard-detalhe {
+    gap: 7mm;
+  }
+
+  .dashboard-cabecalho {
+    display: block;
+    padding-bottom: 4mm;
+  }
+
+  .dashboard-cabecalho__titulo h1 {
+    font-size: 24pt;
+  }
+
+  .dashboard-referencia {
+    display: grid;
+    margin-top: 4mm;
+  }
+
+  .dashboard-macro {
+    min-height: 0;
+    border: 1px solid #c8d2de;
+    background: #fff;
+    color: #111827;
+    grid-template-columns: 0.55fr 1.45fr;
+  }
+
+  .dashboard-macro__principal {
+    padding: 7mm;
+    border-color: #c8d2de;
+  }
+
+  .dashboard-macro__principal > span,
+  .dashboard-macro__principal p,
+  .dashboard-macro__contexto dt {
+    color: #42516a;
+  }
+
+  .dashboard-macro__principal > strong,
+  .dashboard-macro__contexto dd {
+    color: #06152f;
+  }
+
+  .dashboard-macro__principal > strong {
+    font-size: 48pt;
+  }
+
+  .dashboard-macro__contexto > div {
+    min-height: 22mm;
+    padding: 5mm;
+    border-color: #dce3eb;
+  }
+
+  .dashboard-corpo {
+    display: block;
+  }
+
+  .entidade-resumo {
+    min-height: 0;
+    padding: 5mm 0;
+  }
+
+  .entidade-resumo h2 {
+    font-size: 24pt;
+  }
+
+  .entidade-score strong {
+    font-size: 38pt;
+  }
+
+  .nota-executiva,
+  .secao-analitica,
+  .indicador-diagnostico,
+  .eventos-entidade__lista > li {
+    break-inside: avoid;
+  }
+
+  .secao-analitica--evolucao .grafico-area {
+    height: 62mm;
+  }
+
+  .secao-editorial__cabecalho,
+  .indicador-diagnostico,
+  .eventos-entidade__lista > li,
+  .evolucao-eventos > li {
+    padding: 4mm 5mm;
+  }
+
+  .eventos-entidade__vazio {
+    display: none;
+  }
 }

@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
+import { FileDown } from 'lucide-react';
 import { api } from '../services/api';
 import { useProjeto } from '../hooks/useProjeto';
 import { EstadoVazio, Mensagem } from '../components/ui/Estados';
 import { RankingPanel } from '../components/dashboard/RankingPanel';
 import { IndicatorDiagnosticList } from '../components/dashboard/IndicatorDiagnosticList';
+import { ExecutiveNote } from '../components/dashboard/ExecutiveNote';
+import { EntityEvents } from '../components/dashboard/EntityEvents';
 import { ScoreEvolutionChart } from '../components/charts/ScoreEvolutionChart';
 
 function periodoAtual() {
@@ -34,6 +37,7 @@ export function DashboardPage() {
   const [overview, setOverview] = useState(null);
   const [entidadeSelecionadaId, setEntidadeSelecionadaId] = useState('');
   const [detalhe, setDetalhe] = useState(null);
+  const [eventos, setEventos] = useState([]);
   const [carregandoOverview, setCarregandoOverview] = useState(false);
   const [carregandoDetalhe, setCarregandoDetalhe] = useState(false);
   const [erro, setErro] = useState('');
@@ -44,6 +48,7 @@ export function DashboardPage() {
     setGrupoId('');
     setOverview(null);
     setDetalhe(null);
+    setEventos([]);
     setEntidadeSelecionadaId('');
     setErro('');
     if (!projetoId) return () => { ativo = false; };
@@ -88,18 +93,26 @@ export function DashboardPage() {
   useEffect(() => {
     let ativo = true;
     setDetalhe(null);
+    setEventos([]);
     if (!overview?.base_referencia_id || !entidadeSelecionadaId) {
       setCarregandoDetalhe(false);
       return () => { ativo = false; };
     }
 
     setCarregandoDetalhe(true);
-    api.get(`/analytics/entidades/${entidadeSelecionadaId}?base_referencia_id=${overview.base_referencia_id}&periodo=${periodo}`)
-      .then((dados) => { if (ativo) setDetalhe(dados); })
+    Promise.all([
+      api.get(`/analytics/entidades/${entidadeSelecionadaId}?base_referencia_id=${overview.base_referencia_id}&periodo=${periodo}`),
+      api.get(`/eventos?projeto_id=${projetoId}&entidade_id=${entidadeSelecionadaId}`),
+    ])
+      .then(([dadosDetalhe, dadosEventos]) => {
+        if (!ativo) return;
+        setDetalhe(dadosDetalhe);
+        setEventos(dadosEventos);
+      })
       .catch((falha) => { if (ativo) setErro(falha.message); })
       .finally(() => { if (ativo) setCarregandoDetalhe(false); });
     return () => { ativo = false; };
-  }, [entidadeSelecionadaId, overview?.base_referencia_id, periodo]);
+  }, [entidadeSelecionadaId, overview?.base_referencia_id, periodo, projetoId]);
 
   const grupoSelecionado = useMemo(
     () => grupos.find((grupo) => String(grupo.id) === String(grupoId)) || null,
@@ -107,6 +120,35 @@ export function DashboardPage() {
   );
   const base = overview?.base_referencia;
   const avaliacao = detalhe?.avaliacao;
+  const eventosDoPeriodo = eventos.filter((evento) => evento.periodo === periodo);
+
+  async function atualizarEntidadeAposEvento() {
+    const [dadosDetalhe, dadosEventos] = await Promise.all([
+      api.get(`/analytics/entidades/${entidadeSelecionadaId}?base_referencia_id=${overview.base_referencia_id}&periodo=${periodo}`),
+      api.get(`/eventos?projeto_id=${projetoId}&entidade_id=${entidadeSelecionadaId}`),
+    ]);
+    setDetalhe(dadosDetalhe);
+    setEventos(dadosEventos);
+  }
+
+  async function criarEvento(dados) {
+    await api.post('/eventos', {
+      projeto_id: Number(projetoId),
+      entidade_id: Number(entidadeSelecionadaId),
+      ...dados,
+    });
+    await atualizarEntidadeAposEvento();
+  }
+
+  async function editarEvento(eventoId, dados) {
+    await api.patch(`/eventos/${eventoId}`, dados);
+    await atualizarEntidadeAposEvento();
+  }
+
+  async function excluirEvento(eventoId) {
+    await api.delete(`/eventos/${eventoId}`);
+    await atualizarEntidadeAposEvento();
+  }
 
   if (!projeto) {
     return <EstadoVazio titulo="Nenhum projeto selecionado" descricao="Crie ou selecione um projeto para começar a análise." />;
@@ -170,13 +212,17 @@ export function DashboardPage() {
           {entidadeSelecionadaId && !carregandoDetalhe && detalhe && <>
             <section className="entidade-resumo" aria-labelledby="titulo-entidade">
               <div><span>Entidade selecionada</span><h2 id="titulo-entidade">{detalhe.entidade_nome}</h2><p>{formatarPeriodo(periodo)} · <b>{avaliacao?.status || 'SEM AVALIAÇÃO'}</b></p></div>
-              <div className="entidade-score"><span>Global Score</span><strong>{formatarNumero(avaliacao?.global_score)}</strong><small>escala 0–100</small></div>
+              <div className="entidade-resumo__resultado"><button type="button" className="botao botao--secundario nao-imprimir" onClick={() => window.print()}><FileDown aria-hidden="true" />Exportar relatório</button><div className="entidade-score"><span>Global Score</span><strong>{formatarNumero(avaliacao?.global_score)}</strong><small>escala 0–100</small></div></div>
             </section>
+
+            <ExecutiveNote leitura={detalhe.leitura_periodo} quantidadeEventos={eventosDoPeriodo.length} />
 
             <section className="secao-analitica secao-analitica--evolucao" aria-labelledby="titulo-evolucao">
               <div className="secao-editorial__cabecalho"><div><span>Tendência</span><h2 id="titulo-evolucao">Evolução do Global Score</h2></div><small>Mesma Base de Referência</small></div>
-              <ScoreEvolutionChart dados={detalhe.evolucao} eventos={[]} />
+              <ScoreEvolutionChart dados={detalhe.evolucao} />
             </section>
+
+            <EntityEvents eventos={eventos} periodoPadrao={periodo} aoCriar={criarEvento} aoEditar={editarEvento} aoExcluir={excluirEvento} />
 
             <section className="secao-analitica" aria-labelledby="titulo-indicadores">
               <div className="secao-editorial__cabecalho"><div><span>Diagnóstico</span><h2 id="titulo-indicadores">Indicadores da entidade</h2></div><small>{detalhe.indicadores.length} indicadores</small></div>
