@@ -71,6 +71,9 @@ export function DashboardPage() {
         if (!ativo) return;
         setOverview(dados);
         setEntidadeSelecionadaId((atual) => {
+          if (dados.base_referencia?.modo === 'HISTORICO_ENTIDADE') {
+            return String(dados.base_referencia.entidade_referencia_id || '');
+          }
           const permaneceNoRanking = dados.ranking.some(
             (item) => String(item.entidade_id) === String(atual),
           );

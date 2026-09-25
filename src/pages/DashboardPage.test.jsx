@@ -63,17 +63,20 @@ function detalhe(entidadeId, nome, score) {
   };
 }
 
-function configurarApi() {
+function configurarApi(dadosOverview = overview) {
   obter.mockImplementation((caminho) => {
     if (caminho === '/grupos?projeto_id=1') {
       return Promise.resolve([{ id: 10, nome: 'Filiais nacionais', ativo: true }]);
     }
-    if (caminho.startsWith('/analytics/overview?')) return Promise.resolve(overview);
+    if (caminho.startsWith('/analytics/overview?')) return Promise.resolve(dadosOverview);
     if (caminho.startsWith('/analytics/entidades/102?')) {
       return Promise.resolve(detalhe(102, 'Unidade Norte', 91.4));
     }
     if (caminho.startsWith('/analytics/entidades/101?')) {
       return Promise.resolve(detalhe(101, 'Unidade Centro', 78.2));
+    }
+    if (caminho.startsWith('/analytics/entidades/103?')) {
+      return Promise.resolve(detalhe(103, 'Unidade Histórica', 82.6));
     }
     return Promise.reject(new Error(`Consulta inesperada: ${caminho}`));
   });
@@ -116,5 +119,31 @@ describe('Dashboard analítico macro para micro', () => {
 
     expect(obter.mock.calls.some(([caminho]) => caminho.includes('/avaliacoes/999'))).toBe(false);
     expect(obter.mock.calls.some(([caminho]) => caminho.startsWith('/analytics/overview?'))).toBe(true);
+  });
+
+  it('carrega a entidade de referência sem criar ranking no modo histórico', async () => {
+    obter.mockReset();
+    configurarApi({
+      ...overview,
+      quantidade_entidades: 1,
+      quantidade_avaliadas: 1,
+      ranking: [],
+      base_referencia: {
+        ...overview.base_referencia,
+        modo: 'HISTORICO_ENTIDADE',
+        entidade_referencia_id: 103,
+      },
+    });
+
+    render(<DashboardPage />);
+
+    await waitFor(() => expect(obter).toHaveBeenCalledWith(expect.stringMatching(
+      /^\/analytics\/entidades\/103\?base_referencia_id=50&periodo=\d{4}-\d{2}$/,
+    )));
+    expect(await screen.findByRole('heading', { name: 'Unidade Histórica' })).toBeInTheDocument();
+    expect(screen.getByText('Ranking não aplicável')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Evolução do Global Score' })).toBeInTheDocument();
+    expect(screen.getByText('Produtividade')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Unidade Histórica/ })).not.toBeInTheDocument();
   });
 });
