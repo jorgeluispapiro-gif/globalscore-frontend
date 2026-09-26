@@ -24,7 +24,7 @@
     <line x1="56" y1="228" x2="374" y2="228" stroke="#f1f5f9" stroke-width="1.5"/>
     <text x="56" y="254" fill="#334155" font-family="Arial" font-size="13">• Interface web responsiva (Shell &amp; Views)</text>
     <text x="56" y="278" fill="#334155" font-family="Arial" font-size="13">• Login e gestão de sessão de usuário</text>
-    <text x="56" y="302" fill="#334155" font-family="Arial" font-size="13">• Dashboard (Ranking, Evolução, Indicadores)</text>
+    <text x="56" y="302" fill="#334155" font-family="Arial" font-size="13">• Dashboard (Ranking, Evolução, Radar)</text>
     <text x="56" y="326" fill="#334155" font-family="Arial" font-size="13">• Importação assistida (Preview &amp; Dry-run)</text>
     <text x="56" y="350" fill="#334155" font-family="Arial" font-size="13">• Exportação de relatórios em A4</text>
     <rect x="56" y="374" width="318" height="30" rx="8" fill="#f1f5f9"/>

@@ -23,6 +23,7 @@ O **GlobalScore Frontend** é a camada de apresentação e interação do sistem
 - processamento de avaliações em lote;
 - dashboard macro → micro;
 - ranking no modo `ENTRE_ENTIDADES`;
+- radar comparativo com seleção de unidades da mesma Base e período, na escala percentílica de 0 a 100;
 - modo `HISTORICO_ENTIDADE` sem ranking artificial;
 - Global Score na escala **0 a 100**;
 - evolução temporal da entidade;
@@ -124,7 +125,7 @@ npm run build
 Validação realizada no fechamento acadêmico:
 
 - **14 arquivos de teste**
-- **62 testes automatizados passando**
+- **63 testes automatizados passando**
 - **0 warnings e 0 erros no lint**
 - **build Vite concluído com sucesso**
 
