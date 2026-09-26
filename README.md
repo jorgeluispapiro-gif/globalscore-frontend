@@ -293,5 +293,3 @@ Eventos são apresentados como fatos do período. A interface não afirma que um
 A API externa, suas rotas, o cadastro, o plano e as condições de uso estão
 documentados no [README do backend](https://github.com/jorgeluispapiro-gif/globalscore-api#9-autenticação-e-serviço-externo).
 
-O vídeo acadêmico de até seis minutos é um artefato externo aos repositórios e
-deve ser gravado e entregue conforme o roteiro da disciplina.
